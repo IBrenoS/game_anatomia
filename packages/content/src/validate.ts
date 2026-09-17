@@ -65,21 +65,23 @@ export function validateQuestions(questions: Question[]): ValidationError[] {
   return errors;
 }
 
-import { pathToFileURL } from 'url';
-
 // When run as script, perform validation on the actual exported questions
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  import('./questions').then(({ questions }) => {
-    const errors = validateQuestions(questions);
-    if (errors.length > 0) {
-      console.error('Validation errors found:');
-      errors.forEach(e => console.error(`- [${e.questionId || 'GLOBAL'}] ${e.error}`));
-      process.exit(1);
-    } else {
-      console.log('All questions validated successfully.');
+if (typeof process !== 'undefined' && process.argv && process.argv[1]) {
+  import('node:url').then(({ pathToFileURL }) => {
+    if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+      import('./questions.js').then(({ questions }) => {
+        const errors = validateQuestions(questions);
+        if (errors.length > 0) {
+          console.error('Validation errors found:');
+          errors.forEach(e => console.error(`- [${e.questionId || 'GLOBAL'}] ${e.error}`));
+          process.exit(1);
+        } else {
+          console.log('All questions validated successfully.');
+        }
+      }).catch(err => {
+        console.error('Failed to load questions:', err);
+        process.exit(1);
+      });
     }
-  }).catch(err => {
-    console.error('Failed to load questions:', err);
-    process.exit(1);
-  });
+  }).catch(() => {});
 }

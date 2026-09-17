@@ -1,10 +1,10 @@
 {
   "name": "batalha-anatomica",
-  "main": "apps/web/worker/index.ts",
+  "main": "worker/index.ts",
   "compatibility_date": "2024-12-30",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "apps/web/dist",
+    "directory": "dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
