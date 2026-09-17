@@ -11,6 +11,7 @@ import {
   shouldQuestionEnd,
   normalizeNickname,
   isNicknameUnique,
+  canStartGame,
 } from '../index.js';
 import type { PlayerData, PresenceData, AnswerData, RoundData, ScoreData, Question } from '@batalha/protocol';
 
@@ -229,4 +230,22 @@ describe('Batalha Anatômica - End-to-End Acceptance Criteria Suite', () => {
     expect(canPlayerAnswer(player, activePresence, 0, undefined, round, now).allowed).toBe(true);
     expect(canPlayerAnswer(player, inactivePresence, 0, undefined, round, now).allowed).toBe(false);
   });
+
+  it('PRD v1.1: Host cannot start game when player count is 0 and can start when >= 1', () => {
+    // 0 players: start blocked
+    expect(canStartGame([])).toBe(false);
+
+    // Removed players only: start blocked
+    const removedOnly: PlayerData[] = [
+      { playerId: 'p1', nickname: 'Ex-Player', tokenHash: 'h', joinedAt: now, eligibleFromQuestion: 0, removedAt: now - 1000 },
+    ];
+    expect(canStartGame(removedOnly)).toBe(false);
+
+    // 1 active player: start allowed
+    const withActive: PlayerData[] = [
+      { playerId: 'p2', nickname: 'Competitor', tokenHash: 'h2', joinedAt: now, eligibleFromQuestion: 0, removedAt: null },
+    ];
+    expect(canStartGame(withActive)).toBe(true);
+  });
 });
+

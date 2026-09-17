@@ -87,3 +87,11 @@ export function shouldQuestionEnd(
     answers.some(a => a.playerId === p.playerId)
   );
 }
+
+/**
+ * PRD v1.1 / FR 011: Game can only start if there is at least 1 non-removed player in the room
+ */
+export function canStartGame(players: Array<{ removedAt?: number | null }>): boolean {
+  return players.some(p => p.removedAt === null || p.removedAt === undefined);
+}
+

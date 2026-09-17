@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { wsManager } from '../../lib/ws.js';
+import { useGameStore } from '../../stores/gameStore.js';
 import ConfirmDialog from '../shared/ConfirmDialog.js';
 
 interface HostControlsProps {
@@ -51,18 +52,29 @@ export default function HostControls({ roomState }: HostControlsProps) {
     setConfirmAction(null);
   };
 
+  const players = useGameStore((s) => s.players);
+
   const renderStateButtons = () => {
     switch (roomState) {
-      case 'LOBBY':
+      case 'LOBBY': {
+        const canStart = players.length > 0;
         return (
           <button 
             type="button"
+            disabled={!canStart}
             onClick={() => handleCommand('START_GAME')}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer"
+            className={`px-6 py-2.5 font-bold rounded-xl shadow-lg transition-all ${
+              canStart
+                ? 'bg-green-600 hover:bg-green-500 text-white active:scale-95 cursor-pointer shadow-green-950/40'
+                : 'bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed border border-slate-600'
+            }`}
+            title={canStart ? 'Iniciar partida' : 'Aguarde pelo menos 1 participante entrar para iniciar'}
+            aria-label={canStart ? 'Iniciar partida' : 'Aguarde pelo menos 1 participante entrar para iniciar'}
           >
-            ▶ Iniciar Jogo
+            {canStart ? `▶ Iniciar Partida (${players.length})` : 'Aguardando jogadores...'}
           </button>
         );
+      }
       case 'QUESTION_ACTIVE':
         return (
           <div className="flex gap-3">

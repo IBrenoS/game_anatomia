@@ -113,25 +113,40 @@ export function JoinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1e3a5f] text-white flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#152a45] p-8 rounded-3xl shadow-2xl border border-blue-900/50 flex flex-col items-center space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-black mb-2">🦴 Batalha Anatômica</h1>
-          <p className="text-blue-300 font-medium mb-1">PIN do Jogo</p>
-          <div className="text-4xl font-black tracking-widest" aria-label={`PIN: ${pin}`}>{pin}</div>
+    <div className="min-h-screen bg-gradient-to-b from-[#1e3a5f] via-[#152a45] to-[#0f1d30] text-white flex flex-col justify-between p-4 md:p-8">
+      <header className="w-full max-w-md mx-auto flex justify-center py-4">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-blue-200">
+          <span>🐎 Bovino × Equino 🐂</span>
         </div>
+      </header>
 
-        {!isValidRoom ? (
-          <div className="w-full text-center p-4 bg-red-900/50 border border-red-500 rounded-xl text-red-200" role="alert">
-            {error}
-            <button
-              onClick={() => navigate('/')}
-              className="mt-4 px-6 py-2 bg-red-800 hover:bg-red-700 rounded-lg font-medium transition-colors"
-            >
-              Voltar
-            </button>
+      <main className="w-full max-w-md mx-auto my-auto flex flex-col items-center">
+        <div className="w-full bg-[#152a45] p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-900/50 flex flex-col items-center space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl font-black mb-1 flex items-center justify-center gap-2">
+              <span role="img" aria-label="Anatomia">🦴</span>
+              <span>Batalha Anatômica</span>
+            </h1>
+            <p className="text-xs uppercase tracking-widest text-blue-300 font-bold mb-3">
+              PIN da Arena
+            </p>
+            <div className="text-4xl font-mono font-black tracking-widest text-yellow-300 bg-black/30 py-2 px-4 rounded-xl border border-white/10" aria-label={`PIN: ${pin}`}>
+              {pin}
+            </div>
           </div>
-        ) : (
+
+          {!isValidRoom ? (
+            <div className="w-full text-center p-5 bg-red-950/70 border border-red-500/50 rounded-2xl text-red-200 space-y-4" role="alert">
+              <p className="font-semibold">{error}</p>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="w-full py-2.5 px-4 bg-red-800 hover:bg-red-700 rounded-xl font-bold transition-all shadow cursor-pointer"
+              >
+                Digitar outro PIN
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleJoin} className="w-full space-y-6 flex flex-col">
             <p className="text-blue-200 text-sm text-center">
               Seu apelido será visível no telão e apagado após o fim do jogo.
@@ -161,17 +176,37 @@ export function JoinPage() {
             <button
               type="submit"
               disabled={isJoining}
-              className="w-full min-h-[48px] py-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:opacity-50 text-white text-xl font-bold rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center"
+              className="w-full min-h-[52px] py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-slate-700 disabled:to-slate-800 disabled:opacity-50 text-white text-xl font-black rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-wait"
             >
               {isJoining ? (
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Conectando" />
+                <>
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Conectando" />
+                  <span>Entrando na arena...</span>
+                </>
               ) : (
-                'Entrar no Jogo'
+                <>
+                  <span>Entrar na arena</span>
+                  <span>➔</span>
+                </>
               )}
             </button>
           </form>
         )}
-      </div>
+        </div>
+      </main>
+
+      <footer className="w-full max-w-md mx-auto py-6 text-center border-t border-blue-900/40 text-xs text-blue-300/80">
+        <p>
+          Entrou no PIN errado?{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-white hover:text-yellow-300 font-bold underline transition-colors underline-offset-2"
+          >
+            Trocar PIN
+          </button>
+        </p>
+      </footer>
     </div>
   );
 }

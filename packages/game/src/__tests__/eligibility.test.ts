@@ -6,6 +6,7 @@ import {
   isNicknameUnique,
   canPlayerAnswer,
   shouldQuestionEnd,
+  canStartGame,
 } from '../eligibility';
 import type { PlayerData, PresenceData, AnswerData, RoundData } from '@batalha/protocol';
 
@@ -189,3 +190,19 @@ describe('shouldQuestionEnd', () => {
     expect(shouldQuestionEnd(players, presences, answers, round, now)).toBe(false);
   });
 });
+
+describe('canStartGame', () => {
+  it('returns false if players list is empty', () => {
+    expect(canStartGame([])).toBe(false);
+  });
+
+  it('returns false if all players are removed', () => {
+    expect(canStartGame([{ removedAt: 12345 }, { removedAt: 67890 }])).toBe(false);
+  });
+
+  it('returns true if at least 1 player is active and not removed', () => {
+    expect(canStartGame([{ removedAt: null }])).toBe(true);
+    expect(canStartGame([{ removedAt: 12345 }, { removedAt: null }])).toBe(true);
+  });
+});
+
