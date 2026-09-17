@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { wsManager } from '../../lib/ws.js';
 import { useGameStore } from '../../stores/gameStore.js';
+import { soundManager } from '../../lib/sound.js';
 import ConfirmDialog from '../shared/ConfirmDialog.js';
 
 interface HostControlsProps {
@@ -9,13 +10,9 @@ interface HostControlsProps {
 
 export default function HostControls({ roomState }: HostControlsProps) {
   const [confirmAction, setConfirmAction] = useState<'END_QUESTION' | 'END_GAME' | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('batalha_sound_enabled') !== 'false';
-    }
-    return true;
-  });
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => soundManager.isEnabled());
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const pin = useGameStore((s) => s.pin);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -26,9 +23,8 @@ export default function HostControls({ roomState }: HostControlsProps) {
   }, []);
 
   const handleToggleSound = () => {
-    const next = !soundEnabled;
+    const next = soundManager.toggleSound();
     setSoundEnabled(next);
-    localStorage.setItem('batalha_sound_enabled', String(next));
   };
 
   const handleToggleFullscreen = () => {
@@ -178,12 +174,25 @@ export default function HostControls({ roomState }: HostControlsProps) {
         <button
           type="button"
           onClick={handleToggleFullscreen}
-          className="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-semibold text-white/80 transition-all"
+          className="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-semibold text-white/80 transition-all cursor-pointer"
           title="Alternar tela cheia"
           aria-label="Alternar tela cheia"
         >
           {isFullscreen ? '⛶ Sair da Tela Cheia' : '⛶ Tela Cheia'}
         </button>
+        {pin && (
+          <a
+            href={`/screen/${pin}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-2.5 rounded-xl border border-blue-400/40 bg-blue-600/30 hover:bg-blue-600/50 text-sm font-semibold text-blue-100 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            title="Abrir Telão em nova aba"
+            aria-label="Abrir Telão em nova aba"
+          >
+            <span>📺</span>
+            <span className="hidden sm:inline">Abrir Telão</span>
+          </a>
+        )}
       </div>
 
       {/* Ações de controle de estado */}

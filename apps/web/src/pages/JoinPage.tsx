@@ -95,13 +95,17 @@ export function JoinPage() {
     setIsJoining(true);
 
     // Connect WebSocket, then send JOIN_ROOM once connected
-    connect(pin, 'player');
-    const unsub = wsManager.onStateChange((state) => {
-      if (state === 'connected') {
-        wsManager.joinRoom(pin, trimmed);
-        unsub();
-      }
-    });
+    if (wsManager.state === 'connected') {
+      wsManager.joinRoom(pin, trimmed);
+    } else {
+      connect(pin, 'player');
+      const unsub = wsManager.onStateChange((state) => {
+        if (state === 'connected') {
+          wsManager.joinRoom(pin, trimmed);
+          unsub();
+        }
+      });
+    }
   };
 
   if (isChecking) {

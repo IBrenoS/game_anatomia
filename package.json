@@ -7,14 +7,20 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config tests/vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "test:load": "tsx tests/load/websocket-load.ts",
     "lint": "eslint .",
     "typecheck": "tsc -b",
-    "validate-content": "pnpm --filter @batalha/content validate"
+    "validate-content": "pnpm --filter @batalha/content validate",
+    "check": "pnpm typecheck && pnpm validate-content && pnpm test && pnpm test:integration && pnpm build"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.8",
-    "@types/node": "^22.10.0"
+    "vitest": "^2.1.8"
   },
   "engines": {
     "node": ">=20",

@@ -65,6 +65,7 @@ interface GameStoreState {
   
   // Ranking
   rankings: RankingEntry[];
+  previousRankings: RankingEntry[];
   isFinalRanking: boolean;
   
   // Podium
@@ -72,6 +73,12 @@ interface GameStoreState {
   
   // Personal score tracking
   personalScore: PersonalScore;
+  
+  // Countdown tracking
+  countdownStartedAt: number | null;
+
+  // Answer rejected state
+  answerRejected: { code: string; message: string } | null;
   
   // Actions
   setConnectionState: (state: GameStoreState['connectionState']) => void;
@@ -87,6 +94,7 @@ interface GameStoreState {
   handleGameStateChanged: (payload: any) => void;
   handleQuestionStarted: (payload: any) => void;
   handleAnswerAccepted: (payload: any) => void;
+  handleAnswerRejected: (payload: { code: string; message: string }) => void;
   handleQuestionEnded: (payload: any) => void;
   handleAnswerReveal: (payload: any) => void;
   handleRankingUpdated: (payload: any) => void;
@@ -119,11 +127,14 @@ const initialState = {
   selectedOptionId: null,
   answerSubmitted: false,
   answerAcceptedAt: null,
+  answerRejected: null,
+  countdownStartedAt: null,
   correctOptionId: null,
   explanation: null,
   distribution: [],
   personalResult: null,
   rankings: [],
+  previousRankings: [],
   isFinalRanking: false,
   podium: [],
   personalScore: {
@@ -145,30 +156,81 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     pin: data.pin 
   }),
   setSession: (data) => {
-    const { pin } = get();
+    const pin = get().pin || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null);
     if (pin && data.reconnectToken) {
       localStorage.setItem(`batalha_session_${pin}`, data.reconnectToken);
     }
     set({
       playerId: data.playerId,
-      reconnectToken: data.reconnectToken,
+      reconnectToken: data.reconnectToken ?? get().reconnectToken,
       nickname: data.nickname,
     });
   },
 
-  handleSnapshot: (payload) => set((state) => ({
-    ...state,
-    roomState: payload.room?.status ?? state.roomState,
-    roomVersion: payload.room?.roomVersion ?? state.roomVersion,
-    entryLocked: payload.room?.entryLocked ?? state.entryLocked,
-    currentQuestionIndex: payload.room?.currentQuestionIndex ?? state.currentQuestionIndex,
-    players: payload.players ?? state.players,
-    presences: payload.presences ?? state.presences,
-    currentQuestion: payload.currentQuestion ?? state.currentQuestion,
-    startedAt: payload.round?.startedAt ?? state.startedAt,
-    deadlineAt: payload.round?.deadlineAt ?? state.deadlineAt,
-    playerId: payload.playerId ?? state.playerId,
-  })),
+  handleSnapshot: (payload) => set((state) => {
+    const activeQId = payload.currentQuestion?.id;
+    let selectedOptionId = state.selectedOptionId;
+    let answerSubmitted = state.answerSubmitted;
+    let answerAcceptedAt = state.answerAcceptedAt;
+    let personalResult = state.personalResult;
+
+    if (activeQId && Array.isArray(payload.personalAnswers)) {
+      const answerForActive = payload.personalAnswers.find(
+        (a: any) => a.questionId === activeQId || a.question_id === activeQId
+      );
+      if (answerForActive) {
+        selectedOptionId = answerForActive.optionId || answerForActive.option_id;
+        answerSubmitted = true;
+        answerAcceptedAt = answerForActive.receivedAt || answerForActive.received_at || state.answerAcceptedAt;
+        
+        if (payload.room?.status === 'QUESTION_REVEAL') {
+          personalResult = {
+            correct: Boolean(answerForActive.correct),
+            selectedOptionId,
+            awardedPoints: answerForActive.awardedPoints || answerForActive.awarded_points || 0,
+            responseTimeMs: answerForActive.responseTimeMs || answerForActive.response_time_ms || 0,
+          };
+        }
+      }
+    }
+
+    const pid = payload.playerId ?? state.playerId;
+    let personalScore = state.personalScore;
+    if (pid && Array.isArray(payload.scores)) {
+      const myScore = payload.scores.find((s: any) => s.playerId === pid || s.player_id === pid);
+      if (myScore) {
+        personalScore = {
+          totalPoints: myScore.totalPoints ?? myScore.total_points ?? personalScore.totalPoints,
+          correctCount: myScore.correctCount ?? myScore.correct_count ?? personalScore.correctCount,
+          position: personalScore.position,
+        };
+      }
+    }
+
+    const pin = payload.room?.pin ?? state.pin;
+    const reconnectToken = state.reconnectToken ?? (pin ? localStorage.getItem(`batalha_session_${pin}`) : null);
+
+    return {
+      ...state,
+      pin,
+      reconnectToken,
+      roomState: payload.room?.status ?? state.roomState,
+      roomVersion: payload.room?.roomVersion ?? state.roomVersion,
+      entryLocked: payload.room?.entryLocked ?? state.entryLocked,
+      currentQuestionIndex: payload.room?.currentQuestionIndex ?? state.currentQuestionIndex,
+      players: payload.players ?? state.players,
+      presences: payload.presences ?? state.presences,
+      currentQuestion: payload.currentQuestion ?? state.currentQuestion,
+      startedAt: payload.round?.startedAt ?? state.startedAt,
+      deadlineAt: payload.round?.deadlineAt ?? state.deadlineAt,
+      playerId: pid,
+      selectedOptionId,
+      answerSubmitted,
+      answerAcceptedAt,
+      personalResult,
+      personalScore,
+    };
+  }),
 
   handlePlayerJoined: (payload) => set((state) => {
     const exists = state.players.some(p => p.playerId === payload.playerId);
@@ -190,11 +252,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     ),
   })),
 
-  handleGameStateChanged: (payload) => set({
-    roomState: payload.state,
-    roomVersion: payload.roomVersion,
-    entryLocked: payload.entryLocked,
-    currentQuestionIndex: payload.currentQuestionIndex,
+  handleGameStateChanged: (payload) => set((state) => {
+    const isCountdown = payload.state === 'COUNTDOWN';
+    const now = Date.now();
+    return {
+      roomState: payload.state,
+      roomVersion: payload.roomVersion,
+      entryLocked: payload.entryLocked,
+      currentQuestionIndex: payload.currentQuestionIndex,
+      countdownStartedAt: isCountdown ? now : state.countdownStartedAt,
+      startedAt: isCountdown ? now : state.startedAt,
+      deadlineAt: isCountdown ? now + 3000 : state.deadlineAt,
+    };
   }),
 
   handleQuestionStarted: (payload) => set({
@@ -203,10 +272,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     startedAt: payload.startedAt,
     deadlineAt: payload.deadlineAt,
     currentQuestionIndex: payload.questionIndex,
+    countdownStartedAt: null,
     // Reset local answer state
     selectedOptionId: null,
     answerSubmitted: false,
     answerAcceptedAt: null,
+    answerRejected: null,
     correctOptionId: null,
     explanation: null,
     distribution: [],
@@ -216,24 +287,52 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   handleAnswerAccepted: (payload) => set({
     answerSubmitted: true,
     answerAcceptedAt: payload.receivedAt,
+    answerRejected: null,
+  }),
+
+  handleAnswerRejected: (payload) => set({
+    answerSubmitted: false,
+    answerRejected: payload,
   }),
 
   handleQuestionEnded: (_payload) => set({
     deadlineAt: Date.now(), // Close timer visually
   }),
 
-  handleAnswerReveal: (payload) => set({
-    roomState: 'QUESTION_REVEAL' as GameState,
-    correctOptionId: payload.correctOptionId,
-    explanation: payload.explanation ?? null,
-    distribution: payload.distribution ?? [],
-    personalResult: payload.personalResult ?? null,
+  handleAnswerReveal: (payload) => set((state) => {
+    const res = payload.personalResult;
+    let personalScore = state.personalScore;
+    if (res) {
+      personalScore = {
+        ...personalScore,
+        totalPoints: (personalScore.totalPoints || 0) + (res.awardedPoints || 0),
+        correctCount: (personalScore.correctCount || 0) + (res.correct ? 1 : 0),
+      };
+    }
+    return {
+      roomState: 'QUESTION_REVEAL' as GameState,
+      correctOptionId: payload.correctOptionId,
+      explanation: payload.explanation ?? null,
+      distribution: payload.distribution ?? [],
+      personalResult: payload.personalResult ?? null,
+      personalScore,
+    };
   }),
 
-  handleRankingUpdated: (payload) => set({
-    roomState: payload.isFinal ? 'FINAL_RANKING' as GameState : 'ROUND_RANKING' as GameState,
-    rankings: payload.rankings ?? [],
-    isFinalRanking: payload.isFinal ?? false,
+  handleRankingUpdated: (payload) => set((state) => {
+    const newRankings: RankingEntry[] = payload.rankings ?? [];
+    const myRank = newRankings.find(r => r.playerId === state.playerId);
+    return {
+      roomState: payload.isFinal ? 'FINAL_RANKING' as GameState : 'ROUND_RANKING' as GameState,
+      previousRankings: state.rankings.length > 0 ? state.rankings : state.previousRankings,
+      rankings: newRankings,
+      isFinalRanking: payload.isFinal ?? false,
+      personalScore: myRank ? {
+        totalPoints: myRank.totalPoints,
+        correctCount: myRank.correctCount,
+        position: myRank.position,
+      } : state.personalScore,
+    };
   }),
 
   handleRoomFinished: (payload) => set({
@@ -251,6 +350,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     selectedOptionId: null,
     answerSubmitted: false,
     answerAcceptedAt: null,
+    answerRejected: null,
+    countdownStartedAt: null,
     correctOptionId: null,
     explanation: null,
     distribution: [],

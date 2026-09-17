@@ -1,40 +1,71 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bg_q8" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
       <stop offset="100%" stop-color="#1e3a5f" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="accent_q8" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#3b82f6" />
       <stop offset="100%" stop-color="#8b5cf6" />
     </linearGradient>
+    <filter id="shadow_q8" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
   </defs>
-  <rect width="800" height="600" fill="url(#bg)" rx="24" />
-  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
-  
-  <!-- Silhouette / anatomical outline -->
-  <path d="M 120 380 Q 200 320 280 340 T 440 310 Q 520 290 600 330 T 700 400" fill="none" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" opacity="0.4" />
-  <circle cx="280" cy="340" r="12" fill="#8b5cf6" opacity="0.8" />
-  <circle cx="440" cy="310" r="14" fill="#3b82f6" opacity="0.8" />
-  <circle cx="600" cy="330" r="12" fill="#8b5cf6" opacity="0.8" />
 
-  <!-- Educational badge -->
-  <rect x="50" y="50" width="220" height="38" rx="10" fill="url(#accent)" />
-  <text x="160" y="74" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">BATALHA ANATÔMICA</text>
-  
-  <!-- Title & Topic -->
-  <text x="400" y="160" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" text-anchor="middle">Anatomia Comparada: Bovino e Equino</text>
-  <text x="400" y="200" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" text-anchor="middle">Diferenças Anatômicas e Musculares entre as Espécies</text>
-  
-  <!-- Central anatomical focus card -->
-  <g transform="translate(250, 240)">
-    <rect width="300" height="180" rx="16" fill="#090d16" fill-opacity="0.8" stroke="#3b82f6" stroke-width="2" />
-    <path d="M 40 90 L 260 90" stroke="#334155" stroke-dasharray="4,4" stroke-width="2" />
-    <text x="150" y="70" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">ESTRUTURA EM DESTAQUE</text>
-    <rect x="50" y="105" width="200" height="42" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5" />
-    <text x="150" y="132" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Bovino vs Equino</text>
+  <!-- Background Canvas -->
+  <rect width="800" height="600" fill="url(#bg_q8)" rx="24" />
+  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
+
+  <!-- Educational Header Badge -->
+  <rect x="50" y="44" width="220" height="36" rx="10" fill="url(#accent_q8)" filter="url(#shadow_q8)" />
+  <text x="160" y="67" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" letter-spacing="1.5" text-anchor="middle">BATALHA ANATÔMICA</text>
+
+  <!-- Topic Titles (No spoilers) -->
+  <text x="400" y="125" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" text-anchor="middle">Miologia Comparada de Grandes Animais</text>
+  <text x="400" y="152" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" text-anchor="middle">Padrões Morfológicos da Musculatura Glútea e Femoral</text>
+
+  <!-- Comparative Side-by-Side Schematic -->
+  <g transform="translate(80, 180)">
+    <!-- Pattern I (Left Card: Fused muscle mass) -->
+    <g transform="translate(30, 0)">
+      <rect width="260" height="230" rx="14" fill="#1e293b" fill-opacity="0.7" stroke="#38bdf8" stroke-width="1.5" />
+      <text x="130" y="32" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="13" font-weight="800" text-anchor="middle">PADRÃO MORFOLÓGICO I</text>
+      <text x="130" y="52" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">(Massa muscular contínua / fundida)</text>
+
+      <!-- Fused muscular silhouette -->
+      <path d="M 60 180 C 50 120 90 90 140 95 C 190 100 220 130 210 180 C 180 200 90 200 60 180 Z"
+            fill="#38bdf8" fill-opacity="0.3" stroke="#38bdf8" stroke-width="2.5" />
+
+      <!-- Internal continuous striations -->
+      <path d="M 90 115 Q 140 135 180 125 M 85 145 Q 135 165 190 155" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="3,3" />
+
+      <!-- Pin indicator -->
+      <circle cx="135" cy="145" r="5" fill="#38bdf8" />
+      <text x="130" y="218" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="10" font-weight="600" text-anchor="middle">Fusão miológica evidente</text>
+    </g>
+
+    <!-- Pattern II (Right Card: Separate muscular bellies) -->
+    <g transform="translate(350, 0)">
+      <rect width="260" height="230" rx="14" fill="#1e293b" fill-opacity="0.7" stroke="#64748b" stroke-width="1.5" />
+      <text x="130" y="32" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="13" font-weight="800" text-anchor="middle">PADRÃO MORFOLÓGICO II</text>
+      <text x="130" y="52" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" text-anchor="middle">(Ventres distintos e independentes)</text>
+
+      <!-- Separate muscular silhouettes -->
+      <path d="M 50 170 C 50 120 80 95 120 95 C 140 95 150 120 140 170 Z"
+            fill="#818cf8" fill-opacity="0.25" stroke="#818cf8" stroke-width="2" />
+      <path d="M 155 170 C 150 115 175 100 205 100 C 225 100 230 130 220 170 Z"
+            fill="#a78bfa" fill-opacity="0.25" stroke="#a78bfa" stroke-width="2" />
+
+      <!-- Separation groove line -->
+      <line x1="148" y1="90" x2="148" y2="180" stroke="#f8fafc" stroke-width="2" stroke-dasharray="4,4" />
+
+      <circle cx="95" cy="135" r="4" fill="#818cf8" />
+      <circle cx="185" cy="135" r="4" fill="#a78bfa" />
+      <text x="130" y="218" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="10" font-weight="600" text-anchor="middle">Separação anatômica nítida</text>
+    </g>
   </g>
 
-  <!-- Bottom metadata -->
-  <text x="400" y="520" fill="#64748b" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">Material didático de apoio para identificação de miologia veterinária</text>
+  <!-- Bottom pedagogical note -->
+  <text x="400" y="540" fill="#64748b" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle">Material didático de apoio • Batalha Anatômica Veterinária</text>
 </svg>

@@ -97,23 +97,33 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2.5 w-full mt-2">
+            <a
+              href={`/screen/${pin}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/40 transition-all active:scale-95 flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+              title="Abrir Telão da Arena em nova aba"
+            >
+              <span>📺</span>
+              <span>Abrir Telão</span>
+            </a>
             <button
               type="button"
               onClick={handleCopyLink}
-              className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-blue-200 border border-white/10 transition-all active:scale-95"
+              className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-blue-200 border border-white/10 transition-all active:scale-95 cursor-pointer"
             >
               {copiedLink ? '✓ Link Copiado!' : '🔗 Copiar Link'}
             </button>
             <button
               type="button"
               onClick={handleToggleLock}
-              className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md ${
+              className={`flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md cursor-pointer ${
                 entryLocked
                   ? 'bg-amber-600 hover:bg-amber-500 text-white'
                   : 'bg-slate-700 hover:bg-slate-600 text-blue-200'
               }`}
             >
-              {entryLocked ? '🔓 Liberar Entradas' : '🔒 Bloquear Entradas'}
+              {entryLocked ? '🔓 Liberar' : '🔒 Bloquear'}
             </button>
           </div>
         </div>

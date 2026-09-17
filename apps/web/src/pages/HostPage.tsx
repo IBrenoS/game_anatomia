@@ -8,6 +8,7 @@ import HostReveal from '../components/host/HostReveal.js';
 import HostRanking from '../components/host/HostRanking.js';
 import HostPodium from '../components/host/HostPodium.js';
 import HostControls from '../components/host/HostControls.js';
+import CountdownDisplay from '../components/shared/CountdownDisplay.js';
 
 export function HostPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
@@ -47,7 +48,7 @@ export function HostPage() {
       case 'LOBBY':
         return <HostLobby players={players} presences={presences} pin={pin || ''} />;
       case 'COUNTDOWN':
-        return <div className="flex-1 flex flex-col items-center justify-center"><h2 className="text-4xl font-bold text-white">Preparando rodada...</h2></div>;
+        return <CountdownDisplay mode="host" />;
       case 'QUESTION_ACTIVE':
       case 'PAUSED':
         return <HostQuestion question={currentQuestion} currentQuestionIndex={currentQuestionIndex} startedAt={startedAt} deadlineAt={deadlineAt} />;
@@ -68,8 +69,25 @@ export function HostPage() {
   return (
     <div className="min-h-screen bg-[#1e3a5f] flex flex-col">
       <header className="p-4 bg-black/20 flex justify-between items-center text-white border-b border-white/10">
-        <h1 className="text-xl font-bold">Apresentador — Sala PIN: {pin}</h1>
-        <div>Jogadores: {players.length}</div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold">Apresentador — Sala PIN: {pin}</h1>
+          {pin && (
+            <a
+              href={`/screen/${pin}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-blue-400/30"
+              title="Abrir Telão da Arena em nova aba"
+            >
+              <span>📺</span>
+              <span>Abrir Telão</span>
+            </a>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-sm text-blue-200">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Jogadores: <strong className="text-white font-bold">{players.length}</strong></span>
+        </div>
       </header>
       
       <main className="flex-1 flex flex-col p-6">

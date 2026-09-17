@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import type { PublicQuestion, OptionDistribution } from '@batalha/protocol';
+import { soundManager } from '../../lib/sound.js';
 
 interface ScreenRevealProps {
   question: PublicQuestion | null;
@@ -16,6 +18,10 @@ const OPTION_COLORS = [
 ];
 
 export default function ScreenReveal({ question, distribution, correctOptionId, explanation }: ScreenRevealProps) {
+  useEffect(() => {
+    soundManager.playRevealChime();
+  }, []);
+
   if (!question) return <div className="text-white text-center py-24 text-3xl font-bold">Carregando revelação...</div>;
 
   const maxCount = Math.max(...distribution.map(d => d.count), 1);

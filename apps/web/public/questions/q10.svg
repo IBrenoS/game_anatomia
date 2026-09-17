@@ -1,40 +1,68 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bg_q10" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
       <stop offset="100%" stop-color="#1e3a5f" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="100%" stop-color="#8b5cf6" />
+    <linearGradient id="accent_q10" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ef4444" />
     </linearGradient>
+    <filter id="shadow_q10" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
   </defs>
-  <rect width="800" height="600" fill="url(#bg)" rx="24" />
-  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
-  
-  <!-- Silhouette / anatomical outline -->
-  <path d="M 120 380 Q 200 320 280 340 T 440 310 Q 520 290 600 330 T 700 400" fill="none" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" opacity="0.4" />
-  <circle cx="280" cy="340" r="12" fill="#8b5cf6" opacity="0.8" />
-  <circle cx="440" cy="310" r="14" fill="#3b82f6" opacity="0.8" />
-  <circle cx="600" cy="330" r="12" fill="#8b5cf6" opacity="0.8" />
 
-  <!-- Educational badge -->
-  <rect x="50" y="50" width="220" height="38" rx="10" fill="url(#accent)" />
-  <text x="160" y="74" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">BATALHA ANATÔMICA</text>
-  
-  <!-- Title & Topic -->
-  <text x="400" y="160" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" text-anchor="middle">Estudo da Miologia de Grandes Animais</text>
-  <text x="400" y="200" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" text-anchor="middle">Fundamento para Compreensão de Postura e Locomoção</text>
-  
-  <!-- Central anatomical focus card -->
-  <g transform="translate(250, 240)">
-    <rect width="300" height="180" rx="16" fill="#090d16" fill-opacity="0.8" stroke="#3b82f6" stroke-width="2" />
-    <path d="M 40 90 L 260 90" stroke="#334155" stroke-dasharray="4,4" stroke-width="2" />
-    <text x="150" y="70" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">ESTRUTURA EM DESTAQUE</text>
-    <rect x="50" y="105" width="200" height="42" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5" />
-    <text x="150" y="132" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Postura e Locomoção</text>
+  <!-- Background Canvas -->
+  <rect width="800" height="600" fill="url(#bg_q10)" rx="24" />
+  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#f59e0b" stroke-opacity="0.3" stroke-width="2" rx="16" />
+
+  <!-- Educational Header Badge (Final Challenge Theme) -->
+  <rect x="50" y="44" width="220" height="36" rx="10" fill="url(#accent_q10)" filter="url(#shadow_q10)" />
+  <text x="160" y="67" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" letter-spacing="1.5" text-anchor="middle">DESAFIO FINAL • 300 PTS</text>
+
+  <!-- Topic Titles (No spoilers) -->
+  <text x="400" y="125" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" text-anchor="middle">Biomecânica e Miologia Comparada</text>
+  <text x="400" y="152" fill="#fde68a" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" text-anchor="middle">Mecanismos Especializados de Estação e Locomoção no Membro Pélvico</text>
+
+  <!-- Pelvic Limb Stay Apparatus Kinematic Schema -->
+  <g transform="translate(180, 160)">
+    <!-- Bones Architecture (Schematic) -->
+    <!-- Femur -->
+    <line x1="120" y1="50" x2="220" y2="120" stroke="#64748b" stroke-width="8" stroke-linecap="round" />
+    <!-- Stifle Joint (Joelho) -->
+    <circle cx="220" cy="120" r="9" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+    <text x="235" y="115" fill="#fde68a" font-family="system-ui, sans-serif" font-size="10" font-weight="700">ARTICULAÇÃO PROXIMAL</text>
+
+    <!-- Tibia -->
+    <line x1="220" y1="120" x2="160" y2="230" stroke="#64748b" stroke-width="8" stroke-linecap="round" />
+    <!-- Hock Joint (Jarrete / Tarso) -->
+    <circle cx="160" cy="230" r="9" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+    <text x="175" y="240" fill="#fde68a" font-family="system-ui, sans-serif" font-size="10" font-weight="700">ARTICULAÇÃO DISTAL</text>
+
+    <!-- Metatarsus -->
+    <line x1="160" y1="230" x2="160" y2="300" stroke="#64748b" stroke-width="8" stroke-linecap="round" />
+
+    <!-- Cranial Tension Cord (Reciprocal Link A) -->
+    <path d="M 220 120 Q 205 170 160 230" fill="none" stroke="#38bdf8" stroke-width="4" stroke-dasharray="6,3" filter="url(#shadow_q10)" />
+    <!-- Caudal Tension Cord (Reciprocal Link B) -->
+    <path d="M 120 50 Q 150 150 145 220" fill="none" stroke="#ef4444" stroke-width="4" stroke-dasharray="6,3" filter="url(#shadow_q10)" />
+
+    <!-- Synchronized Motion Arcs (Kinematic Coupling) -->
+    <g transform="translate(290, 160)">
+      <!-- Curved reciprocal arrows -->
+      <path d="M 20 0 A 30 30 0 0 1 0 35" fill="none" stroke="#f59e0b" stroke-width="2.5" />
+      <polygon points="0,35 -5,25 5,28" fill="#f59e0b" />
+      <path d="M -20 35 A 30 30 0 0 1 0 0" fill="none" stroke="#f59e0b" stroke-width="2.5" />
+      <polygon points="0,0 5,10 -5,7" fill="#f59e0b" />
+
+      <!-- Reciprocal Mechanism Box -->
+      <rect x="25" y="-12" width="180" height="48" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow_q10)" />
+      <text x="115" y="10" fill="#fde68a" font-family="system-ui, sans-serif" font-size="11" font-weight="800" text-anchor="middle">ACOPLAMENTO RECÍPROCO</text>
+      <text x="115" y="26" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="9" text-anchor="middle">Sincronização Mecânica</text>
+    </g>
   </g>
 
-  <!-- Bottom metadata -->
-  <text x="400" y="520" fill="#64748b" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">Material didático de apoio para identificação de miologia veterinária</text>
+  <!-- Bottom pedagogical note -->
+  <text x="400" y="540" fill="#64748b" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle">Material didático de apoio • Batalha Anatômica Veterinária</text>
 </svg>

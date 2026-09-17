@@ -9,3 +9,6 @@ dist/
 coverage/
 *.tsbuildinfo
 prd_text.txt
+test-results/
+playwright-report/
+

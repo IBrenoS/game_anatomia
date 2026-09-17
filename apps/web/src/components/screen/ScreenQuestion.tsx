@@ -18,6 +18,7 @@ const OPTION_COLORS = [
 
 export default function ScreenQuestion({ question, currentQuestionIndex, deadlineAt }: ScreenQuestionProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [imgError, setImgError] = useState<boolean>(false);
 
   useEffect(() => {
     if (!deadlineAt) return;
@@ -36,12 +37,12 @@ export default function ScreenQuestion({ question, currentQuestionIndex, deadlin
   if (!question) return <div className="text-white text-4xl text-center py-24 font-bold">Carregando questão...</div>;
 
   return (
-    <div className="flex flex-col h-full text-white p-10 max-w-7xl mx-auto w-full select-none">
-      <div className="flex justify-between items-center mb-6">
-        <span className="text-3xl font-black text-blue-200 bg-blue-950/60 px-6 py-2 rounded-2xl border border-blue-400/30">
+    <div className="flex flex-col h-full text-white p-8 md:p-10 max-w-7xl mx-auto w-full select-none justify-between">
+      <div className="flex justify-between items-center mb-4">
+        <span className="text-2xl md:text-3xl font-black text-blue-200 bg-blue-950/60 px-6 py-2 rounded-2xl border border-blue-400/30">
           Questão {currentQuestionIndex + 1} de 10
         </span>
-        <div className={`text-6xl font-mono font-black px-8 py-3 rounded-2xl border transition-all ${
+        <div className={`text-5xl md:text-6xl font-mono font-black px-8 py-2.5 rounded-2xl border transition-all ${
           timeLeft <= 10 
             ? 'bg-red-600/90 border-red-400 text-white motion-safe:animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.5)]' 
             : 'bg-black/40 border-white/20 text-yellow-300'
@@ -50,23 +51,24 @@ export default function ScreenQuestion({ question, currentQuestionIndex, deadlin
         </div>
       </div>
 
-      <h2 className="text-4xl md:text-5xl font-black text-center mb-6 leading-tight drop-shadow-md">
+      <h2 className="text-3xl md:text-5xl font-black text-center mb-4 leading-tight drop-shadow-md">
         {question.prompt}
       </h2>
 
-      {question.media && (
-        <div className="flex justify-center mb-6">
+      {question.media && !imgError && (
+        <div className="flex justify-center mb-4">
           <img 
             src={question.media.src} 
             alt={question.media.alt || 'Ilustração anatômica'} 
             width={question.media.width || 800}
             height={question.media.height || 600}
-            className="max-h-[35vh] object-contain rounded-2xl shadow-2xl border-2 border-white/20 bg-black/20"
+            onError={() => setImgError(true)}
+            className="max-h-[32vh] object-contain rounded-2xl shadow-2xl border-2 border-white/20 bg-black/25 transition-all"
           />
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 mt-auto">
+      <div className="grid grid-cols-2 gap-5 mt-auto">
         {question.options.map((option, index) => {
           const colorClass = OPTION_COLORS[index % OPTION_COLORS.length];
           const letter = OPTION_LETTERS[index] || (index + 1);
@@ -74,9 +76,9 @@ export default function ScreenQuestion({ question, currentQuestionIndex, deadlin
           return (
             <div 
               key={option.id}
-              className={`${colorClass} p-6 rounded-2xl text-2xl md:text-3xl font-black shadow-2xl border-2 flex items-center gap-5 min-h-[100px] transition-transform`}
+              className={`${colorClass} p-5 md:p-6 rounded-2xl text-xl md:text-3xl font-black shadow-2xl border-2 flex items-center gap-4 min-h-[90px] md:min-h-[100px] transition-transform`}
             >
-              <div className="w-14 h-14 rounded-xl bg-black/30 text-white flex items-center justify-center font-black text-3xl shrink-0 border border-white/20 shadow-inner">
+              <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-black/30 text-white flex items-center justify-center font-black text-2xl md:text-3xl shrink-0 border border-white/20 shadow-inner">
                 {letter}
               </div>
               <span className="leading-snug">{option.label}</span>

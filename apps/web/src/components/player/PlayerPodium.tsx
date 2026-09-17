@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import type { RankingEntry } from '@batalha/protocol';
+import { soundManager } from '../../lib/sound.js';
 
 interface PlayerPodiumProps {
   podium: RankingEntry[];
@@ -10,11 +12,17 @@ export default function PlayerPodium({ podium, playerId }: PlayerPodiumProps) {
   const myEntry = podium.find(p => p.playerId === playerId);
   const position = myEntry?.position;
 
+  useEffect(() => {
+    if (isWinner) {
+      soundManager.playFanfare();
+    }
+  }, [isWinner]);
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-white text-center px-4 max-w-sm mx-auto">
+    <div className="flex-1 flex flex-col items-center justify-center text-white text-center px-4 max-w-sm mx-auto select-none">
       {isWinner ? (
-        <div className="w-full bg-yellow-500/20 p-8 rounded-3xl border-2 border-yellow-400/50 shadow-2xl backdrop-blur-md">
-          <div className="text-7xl mb-4">🏆</div>
+        <div className="w-full bg-yellow-500/20 p-8 rounded-3xl border-2 border-yellow-400/50 shadow-2xl backdrop-blur-md animate-[fadeIn_0.5s_ease-out]">
+          <div className="text-7xl mb-4 animate-bounce motion-reduce:animate-none">🏆</div>
           <span className="text-xs uppercase font-bold tracking-widest text-yellow-300">
             Parabéns, Campeão!
           </span>

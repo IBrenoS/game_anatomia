@@ -9,21 +9,21 @@ export const questions: Question[] = [
     durationMs: 60000,
     speedBonusWindowMs: 10000,
     speedBonusMultiplier: 1.25,
-    prompt: 'O que significa dizer que um músculo está localizado na região dorsal?',
+    prompt: 'Na anatomia veterinária de grandes animais, qual região muscular está situada no aspecto superior do tronco, acompanhando a coluna vertebral?',
     media: {
       src: '/questions/q1.svg',
-      alt: 'Esquema anatômico comparativo indicando os eixos dorsal e ventral em grandes animais',
+      alt: 'Esquema anatômico comparativo indicando eixos e regiões corporais em grandes animais',
       width: 800,
       height: 600,
     },
     options: [
-      { id: 'q1_a', label: 'Região do ventre' },
-      { id: 'q1_b', label: 'Região do dorso' },
-      { id: 'q1_c', label: 'Região dos membros' },
-      { id: 'q1_d', label: 'Região da cabeça' }
+      { id: 'q1_a', label: 'Região ventral' },
+      { id: 'q1_b', label: 'Região dorsal' },
+      { id: 'q1_c', label: 'Região cranial' },
+      { id: 'q1_d', label: 'Região caudal' }
     ],
     correctOptionId: 'q1_b',
-    explanation: 'Na anatomia veterinária, a região dorsal refere-se à porção superior do corpo do animal, correspondente ao dorso e coluna vertebral.'
+    explanation: 'Na anatomia veterinária, a região dorsal compreende o aspecto superior do tronco ao longo da coluna vertebral, em oposição à região ventral (ventre).'
   },
   {
     id: 'q2',
@@ -47,7 +47,7 @@ export const questions: Question[] = [
       { id: 'q2_d', label: 'Reto abdominal' }
     ],
     correctOptionId: 'q2_d',
-    explanation: 'O músculo reto abdominal estende-se paralelamente à linha alba no assoalho ventral da cavidade abdominal em bovinos e equinos.'
+    explanation: 'O músculo reto abdominal estende-se paralelamente à linha alba no assoalho ventral da cavidade abdominal em grandes animais.'
   },
   {
     id: 'q3',
@@ -177,21 +177,21 @@ export const questions: Question[] = [
     durationMs: 60000,
     speedBonusWindowMs: 10000,
     speedBonusMultiplier: 1.25,
-    prompt: 'Qual animal está sendo comparado no jogo com o bovino?',
+    prompt: 'Na miologia comparada de grandes animais, em qual espécie ocorre a fusão do músculo glúteo superficial com o bíceps femoral, formando o músculo gluteobíceps?',
     media: {
       src: '/questions/q8.svg',
-      alt: 'Esquema comparativo entre anatomia de grandes animais',
+      alt: 'Morfologia comparada dos músculos glúteos e femorais em grandes animais',
       width: 800,
       height: 600,
     },
     options: [
-      { id: 'q8_a', label: 'Canino' },
-      { id: 'q8_b', label: 'Felino' },
-      { id: 'q8_c', label: 'Equino' },
-      { id: 'q8_d', label: 'Suíno' }
+      { id: 'q8_a', label: 'Bovino' },
+      { id: 'q8_b', label: 'Equino' },
+      { id: 'q8_c', label: 'Ambas as espécies' },
+      { id: 'q8_d', label: 'Nenhuma das espécies' }
     ],
-    correctOptionId: 'q8_c',
-    explanation: 'O escopo pedagógico da Batalha Anatômica compara especificamente as conformações miológicas entre bovinos e equinos.'
+    correctOptionId: 'q8_a',
+    explanation: 'No bovino, o músculo glúteo superficial funde-se com o bíceps femoral, constituindo o músculo gluteobíceps. No equino, esses dois músculos permanecem anatomicamente separados e distintos.'
   },
   {
     id: 'q9',
@@ -201,21 +201,19 @@ export const questions: Question[] = [
     durationMs: 60000,
     speedBonusWindowMs: 10000,
     speedBonusMultiplier: 1.25,
-    prompt: 'Qual alternativa apresenta apenas músculos ventrais?',
+    prompt: 'O músculo reto abdominal e o músculo peitoral superficial são classificados como músculos ventrais do tronco em grandes animais.',
     media: {
       src: '/questions/q9.svg',
-      alt: 'Agrupamento comparativo entre músculos do eixo ventral',
+      alt: 'Agrupamento anatômico dos músculos do aspecto ventral do tronco',
       width: 800,
       height: 600,
     },
     options: [
-      { id: 'q9_a', label: 'Trapézio e latíssimo do dorso' },
-      { id: 'q9_b', label: 'Trapézio e reto abdominal' },
-      { id: 'q9_c', label: 'Romboide e peitoral superficial' },
-      { id: 'q9_d', label: 'Reto abdominal e peitoral superficial' }
+      { id: 'q9_a', label: 'Verdadeiro' },
+      { id: 'q9_b', label: 'Falso' }
     ],
-    correctOptionId: 'q9_d',
-    explanation: 'Tanto o músculo reto abdominal quanto o músculo peitoral superficial situam-se no aspecto ventral (tórax e abdômen).'
+    correctOptionId: 'q9_a',
+    explanation: 'Verdadeiro. Tanto o músculo peitoral superficial (na parede torácica ventral) quanto o músculo reto abdominal (no assoalho abdominal) integram o grupo ventral do tronco.'
   },
   {
     id: 'q10',
@@ -225,20 +223,20 @@ export const questions: Question[] = [
     durationMs: 60000,
     speedBonusWindowMs: 10000,
     speedBonusMultiplier: 1.25,
-    prompt: 'Por que estudar os músculos de bovinos e equinos é importante?',
+    prompt: 'Na miologia funcional e comparada entre grandes animais, qual especialização muscular e tendínea do membro pélvico é exclusiva do equino para o mecanismo de estação passiva (aparelho recíproco)?',
     media: {
       src: '/questions/q10.svg',
-      alt: 'Síntese funcional da miologia aplicada à postura e locomoção veterinária',
+      alt: 'Biomecânica comparada do aparelho recíproco e sustentação passiva no membro pélvico',
       width: 800,
       height: 600,
     },
     options: [
-      { id: 'q10_a', label: 'Para compreender postura, locomoção e movimentos' },
-      { id: 'q10_b', label: 'Apenas para identificar cortes de carne' },
-      { id: 'q10_c', label: 'Exclusivamente para cirurgias' },
-      { id: 'q10_d', label: 'Somente para fins estéticos' }
+      { id: 'q10_a', label: 'Músculo fibular terceiro predominantemente tendíneo acoplado ao flexor digital superficial' },
+      { id: 'q10_b', label: 'Músculo gluteobíceps amplamente fundido com o músculo grácil' },
+      { id: 'q10_c', label: 'Músculo reto abdominal com quatro ventres tendíneos independentes' },
+      { id: 'q10_d', label: 'Músculo peitoral profundo inteiramente cartilaginoso e vestigial' }
     ],
     correctOptionId: 'q10_a',
-    explanation: 'A miologia comparada de grandes animais fundamenta a compreensão clínica, biomecânica e funcional da postura e locomoção em medicina veterinária.'
+    explanation: 'No equino, o músculo fibular terceiro é inteiramente tendíneo e funciona em conjunto com o flexor digital superficial como uma corda recíproca, sincronizando a flexão/extensão do joelho e jarrete para suportar o peso com baixo custo energético. No bovino, o fibular terceiro é predominantemente carnoso.'
   }
 ];

@@ -9,11 +9,15 @@ export const VALID_TRANSITIONS: Transition[] = [
   { from: 'QUESTION_ACTIVE', to: 'QUESTION_REVEAL', trigger: 'all answered / deadline / host ends' },
   { from: 'QUESTION_ACTIVE', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'QUESTION_REVEAL', to: 'ROUND_RANKING', trigger: 'host shows ranking' },
+  { from: 'QUESTION_REVEAL', to: 'FINAL_RANKING', trigger: 'host shows ranking (last question)' },
+  { from: 'QUESTION_REVEAL', to: 'FINISHED', trigger: 'host ends' },
   { from: 'ROUND_RANKING', to: 'COUNTDOWN', trigger: 'host next question, NOT last' },
   { from: 'ROUND_RANKING', to: 'FINAL_RANKING', trigger: 'was last question' },
+  { from: 'ROUND_RANKING', to: 'FINISHED', trigger: 'host ends' },
   { from: 'PAUSED', to: 'COUNTDOWN', trigger: 'host resumes' },
   { from: 'PAUSED', to: 'FINISHED', trigger: 'host ends' },
   { from: 'FINAL_RANKING', to: 'PODIUM', trigger: 'host starts podium' },
+  { from: 'FINAL_RANKING', to: 'FINISHED', trigger: 'host ends' },
   { from: 'PODIUM', to: 'FINISHED', trigger: 'ceremony ends' }
 ];
 

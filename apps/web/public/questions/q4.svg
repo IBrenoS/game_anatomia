@@ -1,40 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bg_q4" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
       <stop offset="100%" stop-color="#1e3a5f" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="accent_q4" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#3b82f6" />
       <stop offset="100%" stop-color="#8b5cf6" />
     </linearGradient>
+    <filter id="shadow_q4" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
   </defs>
-  <rect width="800" height="600" fill="url(#bg)" rx="24" />
-  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
-  
-  <!-- Silhouette / anatomical outline -->
-  <path d="M 120 380 Q 200 320 280 340 T 440 310 Q 520 290 600 330 T 700 400" fill="none" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" opacity="0.4" />
-  <circle cx="280" cy="340" r="12" fill="#8b5cf6" opacity="0.8" />
-  <circle cx="440" cy="310" r="14" fill="#3b82f6" opacity="0.8" />
-  <circle cx="600" cy="330" r="12" fill="#8b5cf6" opacity="0.8" />
 
-  <!-- Educational badge -->
-  <rect x="50" y="50" width="220" height="38" rx="10" fill="url(#accent)" />
-  <text x="160" y="74" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">BATALHA ANATÔMICA</text>
-  
-  <!-- Title & Topic -->
-  <text x="400" y="160" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" text-anchor="middle">Função Muscular Dorsal Comparada</text>
-  <text x="400" y="200" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" text-anchor="middle">Sustentação e Movimentação da Coluna Vertebral</text>
-  
-  <!-- Central anatomical focus card -->
-  <g transform="translate(250, 240)">
-    <rect width="300" height="180" rx="16" fill="#090d16" fill-opacity="0.8" stroke="#3b82f6" stroke-width="2" />
-    <path d="M 40 90 L 260 90" stroke="#334155" stroke-dasharray="4,4" stroke-width="2" />
-    <text x="150" y="70" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">ESTRUTURA EM DESTAQUE</text>
-    <rect x="50" y="105" width="200" height="42" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5" />
-    <text x="150" y="132" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">Biomecânica Dorsal</text>
+  <!-- Background Canvas -->
+  <rect width="800" height="600" fill="url(#bg_q4)" rx="24" />
+  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
+
+  <!-- Educational Header Badge -->
+  <rect x="50" y="44" width="220" height="36" rx="10" fill="url(#accent_q4)" filter="url(#shadow_q4)" />
+  <text x="160" y="67" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" letter-spacing="1.5" text-anchor="middle">BATALHA ANATÔMICA</text>
+
+  <!-- Topic Titles (No spoilers) -->
+  <text x="400" y="125" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" text-anchor="middle">Biomecânica da Coluna Vertebral</text>
+  <text x="400" y="152" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" text-anchor="middle">Análise Funcional e Dinâmica dos Grupos Musculares Epaxiais</text>
+
+  <!-- Spinal Column Biomechanical Vector Diagram -->
+  <g transform="translate(100, 180)">
+    <!-- Vertebral Bridge Schematic (represented as stylized vertebrae segments) -->
+    <g stroke="#64748b" stroke-width="2" fill="#1e293b">
+      <rect x="80" y="110" width="45" height="40" rx="6" />
+      <rect x="140" y="105" width="45" height="40" rx="6" />
+      <rect x="200" y="102" width="45" height="40" rx="6" />
+      <rect x="260" y="100" width="45" height="40" rx="6" />
+      <rect x="320" y="102" width="45" height="40" rx="6" />
+      <rect x="380" y="105" width="45" height="40" rx="6" />
+      <rect x="440" y="110" width="45" height="40" rx="6" />
+    </g>
+
+    <!-- Longitudinal Tension Cable / Epaxial Muscle Vector -->
+    <path d="M 60 70 Q 280 40 500 70" fill="none" stroke="#38bdf8" stroke-width="5" filter="url(#shadow_q4)" />
+
+    <!-- Tension force vectors (arrows) -->
+    <g stroke="#38bdf8" stroke-width="2.5" fill="#38bdf8">
+      <!-- Left vector -->
+      <line x1="180" y1="58" x2="120" y2="64" />
+      <polygon points="120,64 130,58 128,70" />
+      <!-- Right vector -->
+      <line x1="380" y1="58" x2="440" y2="64" />
+      <polygon points="440,64 430,58 432,70" />
+    </g>
+
+    <!-- Support Pillars (Cranial and Pelvic girdles schematic) -->
+    <line x1="100" y1="150" x2="80" y2="230" stroke="#475569" stroke-width="6" stroke-linecap="round" />
+    <line x1="460" y1="150" x2="480" y2="230" stroke="#475569" stroke-width="6" stroke-linecap="round" />
+
+    <!-- Neutral Center Indicator -->
+    <g transform="translate(280, 20)">
+      <circle cx="0" cy="35" r="12" fill="#38bdf8" fill-opacity="0.2" />
+      <circle cx="0" cy="35" r="6" fill="#0284c7" stroke="#38bdf8" stroke-width="2" />
+      <line x1="0" y1="28" x2="0" y2="-5" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3,3" />
+
+      <!-- Neutral Callout Card -->
+      <rect x="-95" y="-38" width="190" height="32" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow_q4)" />
+      <text x="0" y="-17" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="12" font-weight="800" text-anchor="middle">AÇÃO BIOMECÂNICA</text>
+    </g>
+
+    <!-- Axial Reference Line -->
+    <text x="280" y="195" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" font-weight="600" text-anchor="middle">EIXO LONGITUDINAL AXIAL</text>
   </g>
 
-  <!-- Bottom metadata -->
-  <text x="400" y="520" fill="#64748b" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">Material didático de apoio para identificação de miologia veterinária</text>
+  <!-- Bottom pedagogical note -->
+  <text x="400" y="540" fill="#64748b" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle">Material didático de apoio • Batalha Anatômica Veterinária</text>
 </svg>

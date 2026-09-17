@@ -1,22 +1,29 @@
-import React from 'react';
-
 interface PlayerLobbyProps {
   nickname: string | null;
 }
 
 export default function PlayerLobby({ nickname }: PlayerLobbyProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-white text-center">
-      <div className="bg-black/30 p-8 rounded-2xl border border-white/10 w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-2">You're in!</h2>
-        <div className="text-3xl font-black text-yellow-400 mb-8">{nickname}</div>
-        
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div className="flex-1 flex flex-col items-center justify-center text-white text-center select-none">
+      <div className="bg-black/35 p-8 rounded-3xl border border-white/15 w-full max-w-sm shadow-2xl backdrop-blur-md flex flex-col items-center">
+        <span className="text-xs uppercase tracking-widest text-emerald-300 font-bold bg-emerald-950/60 px-4 py-1.5 rounded-full border border-emerald-500/30 mb-3">
+          ✓ Conectado
+        </span>
+        <h2 className="text-2xl font-bold mb-1 text-white">Você está no jogo!</h2>
+        <div className="text-3xl font-black text-yellow-300 mb-8 truncate max-w-full drop-shadow-md">
+          {nickname}
         </div>
         
-        <p className="text-blue-200">Waiting for host to start...</p>
-        <p className="text-sm opacity-50 mt-4">Look at the big screen</p>
+        <div className="flex justify-center mb-6 relative">
+          <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-400 rounded-full animate-spin" />
+        </div>
+        
+        <p className="text-base font-semibold text-blue-100">
+          Aguardando o apresentador iniciar...
+        </p>
+        <p className="text-xs text-blue-300/70 mt-4 font-medium">
+          Olhe para o telão
+        </p>
       </div>
     </div>
   );

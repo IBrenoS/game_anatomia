@@ -1,40 +1,75 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="bg_q3" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
       <stop offset="100%" stop-color="#1e3a5f" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="accent_q3" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#3b82f6" />
       <stop offset="100%" stop-color="#8b5cf6" />
     </linearGradient>
+    <filter id="shadow_q3" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
   </defs>
-  <rect width="800" height="600" fill="url(#bg)" rx="24" />
-  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
-  
-  <!-- Silhouette / anatomical outline -->
-  <path d="M 120 380 Q 200 320 280 340 T 440 310 Q 520 290 600 330 T 700 400" fill="none" stroke="#60a5fa" stroke-width="6" stroke-linecap="round" opacity="0.4" />
-  <circle cx="280" cy="340" r="12" fill="#8b5cf6" opacity="0.8" />
-  <circle cx="440" cy="310" r="14" fill="#3b82f6" opacity="0.8" />
-  <circle cx="600" cy="330" r="12" fill="#8b5cf6" opacity="0.8" />
 
-  <!-- Educational badge -->
-  <rect x="50" y="50" width="220" height="38" rx="10" fill="url(#accent)" />
-  <text x="160" y="74" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">BATALHA ANATÔMICA</text>
-  
-  <!-- Title & Topic -->
-  <text x="400" y="160" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="900" text-anchor="middle">Musculatura Dorsal e Escapular</text>
-  <text x="400" y="200" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" text-anchor="middle">M. Trapézio (Partes Cervical e Torácica)</text>
-  
-  <!-- Central anatomical focus card -->
-  <g transform="translate(250, 240)">
-    <rect width="300" height="180" rx="16" fill="#090d16" fill-opacity="0.8" stroke="#3b82f6" stroke-width="2" />
-    <path d="M 40 90 L 260 90" stroke="#334155" stroke-dasharray="4,4" stroke-width="2" />
-    <text x="150" y="70" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" text-anchor="middle">ESTRUTURA EM DESTAQUE</text>
-    <rect x="50" y="105" width="200" height="42" rx="8" fill="#1e293b" stroke="#60a5fa" stroke-width="1.5" />
-    <text x="150" y="132" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" text-anchor="middle">M. Trapézio</text>
+  <!-- Background Canvas -->
+  <rect width="800" height="600" fill="url(#bg_q3)" rx="24" />
+  <rect x="20" y="20" width="760" height="560" fill="none" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="2" rx="16" />
+
+  <!-- Grid Guide Lines -->
+  <g opacity="0.1" stroke="#94a3b8" stroke-width="1">
+    <line x1="60" y1="180" x2="740" y2="180" />
+    <line x1="60" y1="300" x2="740" y2="300" />
+    <line x1="60" y1="420" x2="740" y2="420" />
   </g>
 
-  <!-- Bottom metadata -->
-  <text x="400" y="520" fill="#64748b" font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">Material didático de apoio para identificação de miologia veterinária</text>
+  <!-- Educational Header Badge -->
+  <rect x="50" y="44" width="220" height="36" rx="10" fill="url(#accent_q3)" filter="url(#shadow_q3)" />
+  <text x="160" y="67" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="800" letter-spacing="1.5" text-anchor="middle">BATALHA ANATÔMICA</text>
+
+  <!-- Topic Titles (No spoilers) -->
+  <text x="400" y="125" fill="#f8fafc" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="900" text-anchor="middle">Miologia do Tronco e Cíngulo Torácico</text>
+  <text x="400" y="152" fill="#93c5fd" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="500" text-anchor="middle">Mapeamento dos Grupos Musculares Superficiais</text>
+
+  <!-- Thoracic / Scapular Musculature Schematic -->
+  <g transform="translate(140, 160)">
+    <!-- Scapula Bone Reference (neutral background) -->
+    <polygon points="260,180 320,110 350,220" fill="#334155" fill-opacity="0.4" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3,3" />
+    <text x="310" y="170" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="10" font-weight="600">ESCÁPULA</text>
+
+    <!-- Cervical and Thoracic Muscular Triangles (Target Structure) -->
+    <path d="M 120 70 L 290 150 L 220 180 Z" fill="#38bdf8" fill-opacity="0.25" stroke="#38bdf8" stroke-width="2" />
+    <path d="M 290 150 L 420 80 L 330 180 Z" fill="#818cf8" fill-opacity="0.25" stroke="#818cf8" stroke-width="2" />
+
+    <!-- Spine of Scapula convergence point -->
+    <line x1="290" y1="150" x2="310" y2="210" stroke="#f8fafc" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Muscle Contours (neutral) -->
+    <path d="M 80 180 Q 200 240 380 230" fill="none" stroke="#475569" stroke-width="2" />
+
+    <!-- Indicator Callout on the highlighted triangular group -->
+    <g transform="translate(270, 30)">
+      <!-- Target Pin -->
+      <circle cx="0" cy="70" r="14" fill="#38bdf8" fill-opacity="0.2" />
+      <circle cx="0" cy="70" r="7" fill="#0284c7" stroke="#38bdf8" stroke-width="2.5" />
+
+      <!-- Leader line up to badge -->
+      <line x1="0" y1="62" x2="0" y2="28" stroke="#38bdf8" stroke-width="2" />
+
+      <!-- Neutral Callout Box -->
+      <rect x="-95" y="0" width="190" height="32" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" filter="url(#shadow_q3)" />
+      <text x="0" y="21" fill="#38bdf8" font-family="system-ui, sans-serif" font-size="12" font-weight="800" text-anchor="middle">GRUPO EM DESTAQUE</text>
+    </g>
+
+    <!-- Neutral Anatomical Landmark Reference -->
+    <g transform="translate(100, 240)">
+      <line x1="0" y1="0" x2="40" y2="0" stroke="#64748b" stroke-width="1.5" />
+      <circle cx="0" cy="0" r="4" fill="#64748b" />
+      <text x="50" y="4" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="11" font-weight="600">LINHA DE REFERÊNCIA</text>
+    </g>
+  </g>
+
+  <!-- Bottom pedagogical note -->
+  <text x="400" y="540" fill="#64748b" font-family="system-ui, sans-serif" font-size="13" text-anchor="middle">Material didático de apoio • Batalha Anatômica Veterinária</text>
 </svg>

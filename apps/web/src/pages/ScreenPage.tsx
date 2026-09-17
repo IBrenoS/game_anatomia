@@ -7,6 +7,7 @@ import ScreenQuestion from '../components/screen/ScreenQuestion.js';
 import ScreenReveal from '../components/screen/ScreenReveal.js';
 import ScreenRanking from '../components/screen/ScreenRanking.js';
 import ScreenPodium from '../components/screen/ScreenPodium.js';
+import CountdownDisplay from '../components/shared/CountdownDisplay.js';
 
 export function ScreenPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
@@ -48,11 +49,7 @@ export function ScreenPage() {
       case 'LOBBY':
         return <ScreenLobby players={players} presences={presences} pin={pin || ''} />;
       case 'COUNTDOWN':
-        return (
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <h2 className="text-8xl font-black text-yellow-300 animate-pulse">Prepare-se!</h2>
-          </div>
-        );
+        return <CountdownDisplay mode="screen" />;
       case 'QUESTION_ACTIVE':
       case 'PAUSED':
         return (

@@ -17,6 +17,12 @@ import {
 } from '@batalha/game';
 import { questions } from '@batalha/content';
 
+export interface ConnectionMeta {
+  role: string;
+  playerId?: string;
+  connectionId?: string;
+}
+
 export class GameRoom extends DurableObject {
   private sql: SqlStorage;
   private room: RoomData | null = null;
@@ -27,6 +33,55 @@ export class GameRoom extends DurableObject {
     super(ctx, env);
     this.sql = ctx.storage.sql;
     this.initSchema();
+  }
+
+  private setConnectionMeta(ws: WebSocket, meta: Partial<ConnectionMeta>): void {
+    const current = this.getConnectionMeta(ws);
+    const merged: ConnectionMeta = { ...current, ...meta };
+    try {
+      (ws as any).serializeAttachment?.(merged);
+    } catch {
+      // In case serializeAttachment is not supported in test mocks
+    }
+    (ws as any).__connectionMeta = merged;
+    (ws as any).__role = merged.role;
+    if (merged.playerId) (ws as any).__playerId = merged.playerId;
+    if (merged.connectionId) (ws as any).__connectionId = merged.connectionId;
+  }
+
+  private getConnectionMeta(ws: WebSocket): ConnectionMeta {
+    if ((ws as any).__connectionMeta) {
+      return (ws as any).__connectionMeta;
+    }
+    try {
+      const deserialized = (ws as any).deserializeAttachment?.();
+      if (deserialized && typeof deserialized === 'object') {
+        const meta = deserialized as ConnectionMeta;
+        (ws as any).__connectionMeta = meta;
+        (ws as any).__role = meta.role;
+        if (meta.playerId) (ws as any).__playerId = meta.playerId;
+        if (meta.connectionId) (ws as any).__connectionId = meta.connectionId;
+        return meta;
+      }
+    } catch {
+      // ignore
+    }
+    let roleTag: string | undefined;
+    let playerTag: string | undefined;
+    try {
+      const tags = this.ctx.getTags(ws);
+      roleTag = tags.find(t => t.startsWith('role:'))?.slice(5);
+      playerTag = tags.find(t => t.startsWith('player:'))?.slice(7);
+    } catch {
+      // ignore
+    }
+    const fallback: ConnectionMeta = {
+      role: (ws as any).__role || roleTag || 'player',
+      playerId: (ws as any).__playerId || playerTag,
+      connectionId: (ws as any).__connectionId,
+    };
+    (ws as any).__connectionMeta = fallback;
+    return fallback;
   }
 
   private initSchema(): void {
@@ -65,6 +120,7 @@ export class GameRoom extends DurableObject {
         started_at INTEGER NOT NULL,
         deadline_at INTEGER NOT NULL,
         remaining_ms INTEGER,
+        accumulated_active_ms INTEGER NOT NULL DEFAULT 0,
         ended_at INTEGER,
         end_reason TEXT
       );
@@ -74,6 +130,7 @@ export class GameRoom extends DurableObject {
         player_id TEXT NOT NULL,
         option_id TEXT NOT NULL,
         received_at INTEGER NOT NULL,
+        response_time_ms INTEGER NOT NULL DEFAULT 0,
         correct INTEGER NOT NULL,
         awarded_points INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (question_id, player_id)
@@ -95,6 +152,9 @@ export class GameRoom extends DurableObject {
         resulting_room_version INTEGER NOT NULL
       );
     `);
+
+    try { this.sql.exec('ALTER TABLE rounds ADD COLUMN accumulated_active_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
+    try { this.sql.exec('ALTER TABLE answers ADD COLUMN response_time_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
   }
 
   // ─── HTTP handlers ──────────────────────────
@@ -162,7 +222,16 @@ export class GameRoom extends DurableObject {
     }
     
     const role = url.searchParams.get('role') || 'player';
-    const token = url.searchParams.get('token') || '';
+    let token = url.searchParams.get('token') || '';
+
+    // Support host token from HttpOnly cookie as well as query param (P1.8)
+    if (!token && role === 'host') {
+      const cookie = request.headers.get('cookie') || '';
+      const match = cookie.match(new RegExp(`(?:^|;\\s*)batalha_host_${this.room.pin}=([^;]+)`));
+      if (match) {
+        token = match[1];
+      }
+    }
 
     if (role === 'host') {
       const tokenHash = await this.hashToken(token);
@@ -175,9 +244,14 @@ export class GameRoom extends DurableObject {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     
-    // Tag the WebSocket with metadata
+    // Tag the WebSocket with metadata and attach hibernation data (P0.4)
     this.ctx.acceptWebSocket(server, [`role:${role}`]);
-    (server as any).__role = role;
+    this.setConnectionMeta(server, { role });
+    
+    // P0.1: Immediate snapshot on connection for host and screen
+    if (role === 'host' || role === 'screen') {
+      this.sendSnapshot(server, role);
+    }
     
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -186,6 +260,12 @@ export class GameRoom extends DurableObject {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== 'string') return;
     
+    // P1.9: Enforce payload size limit (16KB)
+    if (message.length > 16384) {
+      this.sendError(ws, ProtocolError.INVALID_PAYLOAD, 'Payload exceeds 16KB limit');
+      return;
+    }
+
     try {
       const raw = JSON.parse(message);
       const envelope = EventEnvelopeSchema.safeParse(raw);
@@ -197,18 +277,6 @@ export class GameRoom extends DurableObject {
       const { type, payload, correlationId } = envelope.data;
       this.loadRoom();
 
-      if (!(ws as any).__role) {
-        const tags = this.ctx.getTags(ws);
-        const roleTag = tags.find((t: string) => t.startsWith('role:'));
-        if (roleTag) {
-          (ws as any).__role = roleTag.slice(5);
-        }
-        const playerTag = tags.find((t: string) => t.startsWith('player:'));
-        if (playerTag) {
-          (ws as any).__playerId = playerTag.slice(7);
-        }
-      }
-      
       switch (type) {
         case 'JOIN_ROOM':
           await this.handleJoinRoom(ws, payload, correlationId);
@@ -237,8 +305,16 @@ export class GameRoom extends DurableObject {
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string): Promise<void> {
-    const tags = this.ctx.getTags(ws);
-    const playerId = tags.find(t => t.startsWith('player:'))?.slice(7);
+    const meta = this.getConnectionMeta(ws);
+    let playerId = meta.playerId;
+    if (!playerId) {
+      try {
+        const tags = this.ctx.getTags(ws);
+        playerId = tags.find(t => t.startsWith('player:'))?.slice(7);
+      } catch {
+        // ignore
+      }
+    }
     if (playerId) {
       this.markDisconnected(playerId);
       this.broadcastPresenceChange(playerId, false);
@@ -333,11 +409,8 @@ export class GameRoom extends DurableObject {
     
     this.incrementVersion();
     
-    // Store player-ws mapping via tags
-    // Since we can't re-tag, store the association in the WebSocket's attachment
-    (ws as any).__playerId = playerId;
-    (ws as any).__role = 'player';
-    (ws as any).__connectionId = connectionId;
+    // Store player-ws mapping via hibernation attachment and memory cache (P0.4)
+    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId });
     
     // Send SESSION_ACCEPTED to the player
     const sessionEvent = createServerEnvelope(
@@ -401,16 +474,20 @@ export class GameRoom extends DurableObject {
       playerId, connectionId, now
     );
     
-    (ws as any).__playerId = playerId;
-    (ws as any).__role = 'player';
-    (ws as any).__connectionId = connectionId;
+    // Store player-ws mapping via hibernation attachment and memory cache (P0.4)
+    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId });
     
     this.incrementVersion();
     
-    // Send SESSION_ACCEPTED
+    // Send SESSION_ACCEPTED with reconnectToken preserved (P0.2)
     const sessionEvent = createServerEnvelope(
       ServerEventType.SESSION_ACCEPTED,
-      { playerId, role: 'player', nickname: player.nickname as string },
+      {
+        playerId,
+        role: 'player',
+        nickname: player.nickname as string,
+        reconnectToken: parsed.data.reconnectToken,
+      },
       this.room!.roomVersion,
       correlationId
     );
@@ -426,7 +503,7 @@ export class GameRoom extends DurableObject {
   private async handleSubmitAnswer(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
     const parsed = SubmitAnswerSchema.safeParse(payload);
     if (!parsed.success) {
-      this.sendError(ws, 'INVALID_PAYLOAD', 'Invalid answer data');
+      this.sendError(ws, ProtocolError.INVALID_PAYLOAD, 'Invalid answer data');
       return;
     }
     
@@ -435,7 +512,7 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    const playerId = (ws as any).__playerId as string;
+    const playerId = this.getConnectionMeta(ws).playerId;
     if (!playerId) {
       this.sendAnswerRejected(ws, ProtocolError.UNAUTHORIZED, 'Not authenticated', correlationId);
       return;
@@ -447,16 +524,30 @@ export class GameRoom extends DurableObject {
       this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active round', correlationId);
       return;
     }
+
+    // Check if paused (P0.6, P0.7)
+    if (round.state === 'paused') {
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Question is paused', correlationId);
+      return;
+    }
     
-    // Check deadline
+    // Check deadline (P0.6)
     if (now > round.deadlineAt) {
       this.sendAnswerRejected(ws, ProtocolError.DEADLINE_EXCEEDED, 'Deadline exceeded', correlationId);
       return;
     }
-    
-    // Check if paused
-    if (round.state === 'paused') {
-      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Question is paused', correlationId);
+
+    // Validate active question existence and questionId match (P0.6)
+    const question = questions[this.room.currentQuestionIndex];
+    if (!question || parsed.data.questionId !== question.id) {
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Question mismatch or invalid question ID', correlationId);
+      return;
+    }
+
+    // Validate optionId membership in question.options (P0.6)
+    const validOption = question.options.some(opt => opt.id === parsed.data.optionId);
+    if (!validOption) {
+      this.sendAnswerRejected(ws, ProtocolError.INVALID_PAYLOAD, 'Invalid option for question', correlationId);
       return;
     }
     
@@ -475,28 +566,40 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    // Check if already answered
+    // Check if already answered (P0.6: idempotent re-acknowledgement for identical optionId)
     const existing = this.sql.exec(
       'SELECT option_id FROM answers WHERE question_id = ? AND player_id = ?',
       parsed.data.questionId, playerId
     ).toArray();
     
     if (existing.length > 0) {
+      const prevOptionId = existing[0].option_id as string;
+      if (prevOptionId === parsed.data.optionId) {
+        // Idempotent re-acknowledgement
+        const acceptedEvent = createServerEnvelope(
+          ServerEventType.ANSWER_ACCEPTED,
+          { questionId: parsed.data.questionId, receivedAt: now },
+          this.room!.roomVersion,
+          correlationId
+        );
+        ws.send(JSON.stringify(acceptedEvent));
+        return;
+      }
       this.sendAnswerRejected(ws, ProtocolError.ANSWER_ALREADY_SUBMITTED, 'Answer already submitted', correlationId);
       return;
     }
     
-    // Calculate points
-    const question = questions[this.room.currentQuestionIndex];
+    // Calculate points: active response time includes accumulated active time from prior pause segments (P0.7)
+    const activeInCurrentSegment = Math.max(0, now - round.startedAt);
+    const responseTimeMs = round.accumulatedActiveMs + activeInCurrentSegment;
     const correct = parsed.data.optionId === question.correctOptionId;
-    const responseTimeMs = now - round.startedAt;
     const awardedPoints = calculatePoints(question.basePoints, correct, responseTimeMs);
     
     // Persist answer
     this.sql.exec(
-      `INSERT INTO answers (question_id, player_id, option_id, received_at, correct, awarded_points)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      parsed.data.questionId, playerId, parsed.data.optionId, now, correct ? 1 : 0, awardedPoints
+      `INSERT INTO answers (question_id, player_id, option_id, received_at, response_time_ms, correct, awarded_points)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      parsed.data.questionId, playerId, parsed.data.optionId, now, responseTimeMs, correct ? 1 : 0, awardedPoints
     );
     
     // Update score
@@ -528,7 +631,7 @@ export class GameRoom extends DurableObject {
   }
 
   private handleClientAlive(ws: WebSocket, payload: unknown): void {
-    const playerId = (ws as any).__playerId as string;
+    const playerId = this.getConnectionMeta(ws).playerId;
     if (!playerId) return;
     
     const now = Date.now();
@@ -545,8 +648,8 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    // Verify host authorization
-    const role = (ws as any).__role;
+    // Verify host authorization (P1.8)
+    const role = this.getConnectionMeta(ws).role;
     if (role !== 'host') {
       this.sendError(ws, ProtocolError.UNAUTHORIZED, 'Not authorized as host', correlationId);
       return;
@@ -611,8 +714,9 @@ export class GameRoom extends DurableObject {
   }
 
   private handleRequestSnapshot(ws: WebSocket, payload: unknown, correlationId?: string): void {
-    const playerId = (ws as any).__playerId as string;
-    const role = (ws as any).__role as string || 'player';
+    const meta = this.getConnectionMeta(ws);
+    const playerId = meta.playerId;
+    const role = meta.role || 'player';
     this.sendSnapshot(ws, role, playerId, correlationId);
   }
 
@@ -659,8 +763,8 @@ export class GameRoom extends DurableObject {
         nextIndex
       );
       this.sql.exec(
-        `INSERT OR REPLACE INTO rounds (question_id, state, started_at, deadline_at)
-         VALUES (?, 'active', ?, ?)`,
+        `INSERT OR REPLACE INTO rounds (question_id, state, started_at, deadline_at, remaining_ms, accumulated_active_ms)
+         VALUES (?, 'active', ?, ?, NULL, 0)`,
         question.id, now, deadlineAt
       );
     }
@@ -749,14 +853,14 @@ export class GameRoom extends DurableObject {
     // Send personal results to each player
     const playerSockets = this.getWebSocketsByRole('player');
     for (const pws of playerSockets) {
-      const pid = (pws as any).__playerId as string;
+      const pid = this.getConnectionMeta(pws).playerId;
       if (!pid) continue;
       const playerAnswer = answers.find(a => a.playerId === pid);
       const personalResult = playerAnswer ? {
         correct: playerAnswer.correct,
         selectedOptionId: playerAnswer.optionId,
         awardedPoints: playerAnswer.awardedPoints,
-        responseTimeMs: playerAnswer.receivedAt - round.startedAt,
+        responseTimeMs: playerAnswer.responseTimeMs,
       } : null;
       
       pws.send(JSON.stringify(createServerEnvelope(
@@ -834,10 +938,12 @@ export class GameRoom extends DurableObject {
     
     const now = Date.now();
     const remainingMs = Math.max(0, round.deadlineAt - now);
+    const activeInThisSegment = Math.max(0, now - round.startedAt);
+    const accumulatedActiveMs = round.accumulatedActiveMs + activeInThisSegment;
     
     this.sql.exec(
-      `UPDATE rounds SET state = 'paused', remaining_ms = ? WHERE question_id = ?`,
-      remainingMs, round.questionId
+      `UPDATE rounds SET state = 'paused', remaining_ms = ?, accumulated_active_ms = ? WHERE question_id = ?`,
+      remainingMs, accumulatedActiveMs, round.questionId
     );
     
     this.ctx.storage.deleteAlarm();
@@ -907,7 +1013,7 @@ export class GameRoom extends DurableObject {
     };
   }
 
-  private getCurrentRound(): RoundData | null {
+  private getCurrentRound(): (RoundData & { accumulatedActiveMs: number }) | null {
     if (!this.room || this.room.currentQuestionIndex < 0) return null;
     const question = questions[this.room.currentQuestionIndex];
     const rows = this.sql.exec(
@@ -921,6 +1027,7 @@ export class GameRoom extends DurableObject {
       startedAt: r.started_at as number,
       deadlineAt: r.deadline_at as number,
       remainingMs: r.remaining_ms as number | null,
+      accumulatedActiveMs: (r.accumulated_active_ms as number) || 0,
       endedAt: r.ended_at as number | null,
       endReason: r.end_reason as RoundData['endReason'],
     };
@@ -952,7 +1059,7 @@ export class GameRoom extends DurableObject {
     }));
   }
 
-  private getAnswersForQuestion(questionId: string): AnswerData[] {
+  private getAnswersForQuestion(questionId: string): (AnswerData & { responseTimeMs: number })[] {
     return this.sql.exec(
       'SELECT * FROM answers WHERE question_id = ?', questionId
     ).toArray().map(r => ({
@@ -960,6 +1067,7 @@ export class GameRoom extends DurableObject {
       playerId: r.player_id as string,
       optionId: r.option_id as string,
       receivedAt: r.received_at as number,
+      responseTimeMs: (r.response_time_ms as number) || Math.max(0, (r.received_at as number) - (this.getCurrentRound()?.startedAt || 0)),
       correct: Boolean(r.correct),
       awardedPoints: r.awarded_points as number,
     }));
@@ -1036,7 +1144,7 @@ export class GameRoom extends DurableObject {
   private closeOldConnection(playerId: string): void {
     const sockets = this.ctx.getWebSockets();
     for (const ws of sockets) {
-      if ((ws as any).__playerId === playerId) {
+      if (this.getConnectionMeta(ws).playerId === playerId) {
         try { ws.close(1000, 'Replaced by new connection'); } catch { /* ignore */ }
       }
     }
@@ -1063,14 +1171,14 @@ export class GameRoom extends DurableObject {
   private broadcastByRole(role: string, envelope: unknown): void {
     const msg = JSON.stringify(envelope);
     for (const ws of this.ctx.getWebSockets()) {
-      if ((ws as any).__role === role) {
+      if (this.getConnectionMeta(ws).role === role) {
         try { ws.send(msg); } catch { /* ignore */ }
       }
     }
   }
 
   private getWebSocketsByRole(role: string): WebSocket[] {
-    return this.ctx.getWebSockets().filter(ws => (ws as any).__role === role);
+    return this.ctx.getWebSockets().filter(ws => this.getConnectionMeta(ws).role === role);
   }
 
   private broadcastStateChange(correlationId?: string): void {
@@ -1131,7 +1239,12 @@ export class GameRoom extends DurableObject {
       personalAnswers = this.sql.exec(
         'SELECT question_id, option_id, correct, awarded_points FROM answers WHERE player_id = ?',
         playerId
-      ).toArray();
+      ).toArray().map((a: any) => ({
+        questionId: a.question_id as string,
+        optionId: a.option_id as string,
+        correct: Boolean(a.correct),
+        awardedPoints: a.awarded_points as number,
+      }));
     }
     
     const snapshot = createServerEnvelope(

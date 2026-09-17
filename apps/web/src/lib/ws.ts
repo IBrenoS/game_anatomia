@@ -10,6 +10,7 @@ export class WebSocketManager {
   private maxReconnectDelay = 30000;
   private _state: ConnectionState = 'disconnected';
   private _roomVersion = 0;
+  private seenEventIds = new Set<string>();
   private handlers = new Map<string, Set<(payload: any, envelope: any) => void>>();
   private stateHandlers = new Set<(state: ConnectionState) => void>();
   private currentPin: string | null = null;
@@ -50,6 +51,16 @@ export class WebSocketManager {
       this.setState('connected');
       this.reconnectAttempt = 0;
       this.startHeartbeat();
+
+      if (this.currentPin) {
+        if (this.currentRole === 'player' && this.currentToken) {
+          // P0.2: Automatically resume session when connecting with saved player token
+          this.resumeSession(this.currentPin, this.currentToken);
+        } else if (this.currentRole === 'host' || this.currentRole === 'screen') {
+          // P0.1: Immediate snapshot request for host/screen
+          this.requestSnapshot();
+        }
+      }
     };
 
     this.ws.onclose = () => {
@@ -77,9 +88,41 @@ export class WebSocketManager {
         const envelope = parsed.data;
         // Skip internal keep-alive responses
         if (envelope.type === 'PONG') return;
+
+        // P0.3: Deduplicate eventId
+        if (envelope.eventId) {
+          if (this.seenEventIds.has(envelope.eventId)) {
+            return;
+          }
+          this.seenEventIds.add(envelope.eventId);
+          if (this.seenEventIds.size > 500) {
+            const oldest = this.seenEventIds.values().next().value;
+            if (oldest) this.seenEventIds.delete(oldest);
+          }
+        }
         
+        // P0.3: Protocol ordering, stale event discarding, and gap detection
         if ('roomVersion' in envelope && typeof envelope.roomVersion === 'number') {
-           this._roomVersion = envelope.roomVersion;
+          const incomingVersion = envelope.roomVersion;
+          if (envelope.type === 'SNAPSHOT') {
+            this._roomVersion = incomingVersion;
+          } else if (this._roomVersion > 0) {
+            if (incomingVersion < this._roomVersion) {
+              // Discard outdated event
+              console.warn(`[ws] Discarding outdated event ${envelope.type} (v${incomingVersion} < current v${this._roomVersion})`);
+              return;
+            }
+            if (incomingVersion > this._roomVersion + 1) {
+              // Version gap detected: request snapshot to resynchronize
+              console.warn(`[ws] Version gap detected (current v${this._roomVersion}, incoming v${incomingVersion}). Requesting SNAPSHOT.`);
+              this._roomVersion = incomingVersion;
+              this.requestSnapshot();
+            } else {
+              this._roomVersion = incomingVersion;
+            }
+          } else {
+            this._roomVersion = incomingVersion;
+          }
         }
 
         const typeHandlers = this.handlers.get(envelope.type);
@@ -103,6 +146,8 @@ export class WebSocketManager {
       this.ws.close();
       this.ws = null;
     }
+    this.seenEventIds.clear();
+    this._roomVersion = 0;
     this.currentPin = null;
     this.currentRole = null;
     this.currentToken = undefined;

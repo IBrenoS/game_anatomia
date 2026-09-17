@@ -79,7 +79,7 @@ export function PlayerPage() {
           />
         );
       case 'QUESTION_REVEAL':
-        return <PlayerReveal result={personalResult} correctOptionId={correctOptionId} />;
+        return <PlayerReveal result={personalResult} correctOptionId={correctOptionId} question={currentQuestion} />;
       case 'ROUND_RANKING':
       case 'FINAL_RANKING':
         return <PlayerRanking ranking={personalRanking} isFinal={isFinalRanking} />;

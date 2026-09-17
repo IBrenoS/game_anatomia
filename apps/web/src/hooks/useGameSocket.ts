@@ -49,6 +49,9 @@ export function useGameSocket() {
       wsManager.onEvent(ServerEventType.ANSWER_ACCEPTED, (payload) => {
         useGameStore.getState().handleAnswerAccepted(payload);
       }),
+      wsManager.onEvent(ServerEventType.ANSWER_REJECTED, (payload) => {
+        useGameStore.getState().handleAnswerRejected(payload);
+      }),
       wsManager.onEvent(ServerEventType.QUESTION_ENDED, (payload) => {
         useGameStore.getState().handleQuestionEnded(payload);
       }),
@@ -70,7 +73,6 @@ export function useGameSocket() {
 
     return () => {
       unsubscribes.forEach(unsub => unsub());
-      wsManager.disconnect();
       initialized.current = false;
     };
   }, []);
