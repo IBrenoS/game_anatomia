@@ -20,6 +20,8 @@ export const ProtocolError = {
   DEADLINE_EXCEEDED: 'DEADLINE_EXCEEDED',
   /** Token ausente, inválido ou revogado */
   UNAUTHORIZED: 'UNAUTHORIZED',
+  /** Payload malformado ou inválido */
+  INVALID_PAYLOAD: 'INVALID_PAYLOAD',
 } as const;
 
 export type ProtocolError = (typeof ProtocolError)[keyof typeof ProtocolError];
@@ -35,4 +37,5 @@ export const ERROR_MESSAGES: Record<ProtocolError, string> = {
   QUESTION_NOT_ACTIVE: 'Nenhuma questão ativa no momento.',
   DEADLINE_EXCEEDED: 'O tempo para responder encerrou.',
   UNAUTHORIZED: 'Sessão inválida ou expirada.',
+  INVALID_PAYLOAD: 'Dados inválidos ou malformados.',
 };

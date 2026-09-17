@@ -97,8 +97,10 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const joinUrl = `${url.origin}/join/${pin}`;
     
     const headers = new Headers(corsHeaders());
-    // P1.8 Host Session Security: set HttpOnly cookie for host session
-    headers.set('Set-Cookie', `batalha_host_${pin}=${hostToken}; Path=/; HttpOnly; SameSite=Strict`);
+    // P1.8 Host Session Security: set HttpOnly cookie (with Secure on HTTPS) for host session
+    const isSecure = url.protocol === 'https:';
+    const secureFlag = isSecure ? '; Secure' : '';
+    headers.set('Set-Cookie', `batalha_host_${pin}=${hostToken}; Path=/; HttpOnly; SameSite=Strict${secureFlag}`);
 
     return Response.json({ pin, joinUrl, hostToken }, {
       status: 201,

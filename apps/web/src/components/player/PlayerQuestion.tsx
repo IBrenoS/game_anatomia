@@ -50,7 +50,7 @@ export default function PlayerQuestion({
     soundManager.playAnswerSubmit();
 
     // Transmit authoritative answer
-    wsManager.submitAnswer(question.id, wsManager.roomVersion, optionId);
+    wsManager.submitAnswer(question.id, currentQuestionIndex, optionId);
   };
 
   return (

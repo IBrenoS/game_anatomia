@@ -544,6 +544,13 @@ export class GameRoom extends DurableObject {
       return;
     }
 
+    // Validate questionVersion (P0.6)
+    const currentQIndex = this.room.currentQuestionIndex;
+    if (parsed.data.questionVersion < currentQIndex) {
+      this.sendAnswerRejected(ws, ProtocolError.STALE_VERSION, 'Stale question version', correlationId);
+      return;
+    }
+
     // Validate optionId membership in question.options (P0.6)
     const validOption = question.options.some(opt => opt.id === parsed.data.optionId);
     if (!validOption) {

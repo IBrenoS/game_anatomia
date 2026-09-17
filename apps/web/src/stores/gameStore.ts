@@ -186,7 +186,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         if (payload.room?.status === 'QUESTION_REVEAL') {
           personalResult = {
             correct: Boolean(answerForActive.correct),
-            selectedOptionId,
+            selectedOptionId: selectedOptionId || '',
             awardedPoints: answerForActive.awardedPoints || answerForActive.awarded_points || 0,
             responseTimeMs: answerForActive.responseTimeMs || answerForActive.response_time_ms || 0,
           };
@@ -247,9 +247,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   }),
 
   handlePlayerPresenceChanged: (payload) => set((state) => ({
-    presences: state.presences.map(p =>
-      p.playerId === payload.playerId ? { ...p, connected: payload.connected } : p
-    ),
+    players: payload.reason === 'removed'
+      ? state.players.filter(p => p.playerId !== payload.playerId)
+      : state.players,
+    presences: payload.reason === 'removed'
+      ? state.presences.filter(p => p.playerId !== payload.playerId)
+      : state.presences.map(p =>
+          p.playerId === payload.playerId ? { ...p, connected: payload.connected } : p
+        ),
   })),
 
   handleGameStateChanged: (payload) => set((state) => {

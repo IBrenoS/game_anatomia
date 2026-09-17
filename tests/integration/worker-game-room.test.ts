@@ -459,6 +459,72 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect(rejected).toBeDefined();
       expect(rejected.payload.code).toBe(ProtocolError.QUESTION_NOT_ACTIVE);
     });
+
+    it('rejects answer with stale questionVersion and preserves state immutability', async () => {
+      const q1 = questions[0];
+      // Alice and Bob answer Question 0 so it completes
+      await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+      await bobClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+
+      // Host advances to Question 1 (index 1)
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: 9999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: 9999 }, 0));
+      await room.alarm(); // Question index 1 is now active!
+
+      const q2 = questions[1];
+      const initialVersion = (room as any).room.roomVersion;
+      const initialAnswersCount = (room as any).sql.exec('SELECT count(*) as cnt FROM answers').toArray()[0].cnt;
+
+      // Alice sends answer for Question 2 with stale questionVersion: 0 (< currentQuestionIndex 1)
+      aliceClient.clearMessages();
+      await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q2.id,
+        questionVersion: 0, // Stale!
+        optionId: q2.correctOptionId,
+      }, 0));
+
+      const rejected = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REJECTED);
+      expect(rejected).toBeDefined();
+      expect(rejected.payload.code).toBe(ProtocolError.STALE_VERSION);
+
+      // Verify immutability: roomVersion and answers unchanged
+      expect((room as any).room.roomVersion).toBe(initialVersion);
+      expect((room as any).sql.exec('SELECT count(*) as cnt FROM answers').toArray()[0].cnt).toBe(initialAnswersCount);
+    });
+
+    it('rejects answer after deadline and preserves state immutability', async () => {
+      const q1 = questions[0];
+      const initialVersion = (room as any).room.roomVersion;
+      const initialAnswersCount = (room as any).sql.exec('SELECT count(*) as cnt FROM answers').toArray()[0].cnt;
+
+      const realNow = Date.now;
+      try {
+        Date.now = () => realNow() + 100_000; // Far past deadline
+        await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: q1.id,
+          questionVersion: 0,
+          optionId: q1.options[0].id,
+        }, 0));
+
+        const rejected = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REJECTED);
+        expect(rejected).toBeDefined();
+        expect(rejected.payload.code).toBe(ProtocolError.DEADLINE_EXCEEDED);
+
+        // Verify immutability
+        expect((room as any).room.roomVersion).toBe(initialVersion);
+        expect((room as any).sql.exec('SELECT count(*) as cnt FROM answers').toArray()[0].cnt).toBe(initialAnswersCount);
+      } finally {
+        Date.now = realNow;
+      }
+    });
   });
 
   describe('P0.7 Pause, Resume & Speed Bonus Window Preservation', () => {
@@ -514,6 +580,58 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const accepted = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_ACCEPTED);
       expect(accepted).toBeDefined();
     });
+
+    it('preserves exact speed bonus window across pause and resume (P0.7: 4s + 30s pause + 3s = 7s active)', async () => {
+      const q1 = questions[0];
+      const realNow = Date.now;
+      let mockNow = Date.now();
+      Date.now = () => mockNow;
+
+      try {
+        // 1. Question runs for 4 seconds active
+        mockNow += 4000;
+
+        // 2. Host pauses game
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: 9999 }, 2));
+
+        // Submitting while paused is rejected with QUESTION_NOT_ACTIVE
+        await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: q1.id,
+          questionVersion: 0,
+          optionId: q1.correctOptionId,
+        }, 3));
+        const rejected = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REJECTED);
+        expect(rejected?.payload?.code).toBe(ProtocolError.QUESTION_NOT_ACTIVE);
+
+        // 3. Paused for 30 seconds
+        mockNow += 30_000;
+
+        // 4. Host resumes
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: 9999 }, 4));
+        mockNow += 3000;
+        await room.alarm(); // Resume countdown ends
+
+        // 5. Player responds after 3 more seconds of active time (total active = 4s + 3s = 7s <= 10s bonus)
+        mockNow += 3000;
+        aliceClient.clearMessages();
+        await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: q1.id,
+          questionVersion: 0,
+          optionId: q1.correctOptionId,
+        }, 5));
+
+        const accepted = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_ACCEPTED);
+        expect(accepted).toBeDefined();
+
+        // 6. Host ends question to reveal points and verify speed bonus was awarded (100 * 1.25 = 125)
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_QUESTION', expectedRoomVersion: 9999 }, 6));
+        const reveal = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REVEAL);
+        expect(reveal).toBeDefined();
+        expect(reveal.payload.personalResult.awardedPoints).toBe(125);
+      } finally {
+        Date.now = realNow;
+      }
+    });
   });
 
   describe('P0.5 10th Question Deterministic Transition Sequence', () => {
@@ -541,7 +659,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         // Player answers (which automatically ends question because all answered!)
         await pClient.send(createClientEnvelope('SUBMIT_ANSWER', {
           questionId: q.id,
-          questionVersion: 0,
+          questionVersion: qIndex,
           optionId: q.correctOptionId,
         }, 0));
 
@@ -560,7 +678,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       // Player answers 10th question (which triggers auto-end and QUESTION_REVEAL)
       await pClient.send(createClientEnvelope('SUBMIT_ANSWER', {
         questionId: q10.id,
-        questionVersion: 0,
+        questionVersion: 9,
         optionId: q10.correctOptionId,
       }, 0));
 
@@ -592,6 +710,35 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         m => m.type === ServerEventType.GAME_STATE_CHANGED && m.payload.state === GameState.FINISHED
       );
       expect(stateChange3).toBeDefined();
+    });
+
+    it('executes room cleanup on alarm after FINISHED state (P3.2)', async () => {
+      // Connect host & player
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostServer = ctx.getWebSockets('role:host')[0];
+      const hostClient = attachTestClient(room, hostServer, hostServer.peer!);
+
+      const pReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(pReq);
+      const pServer = ctx.getWebSockets('role:player')[0];
+      const pClient = attachTestClient(room, pServer, pServer.peer!);
+      await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'CleanTest' }, 0));
+
+      // End game
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_GAME', expectedRoomVersion: 99999 }, 0));
+      expect((room as any).room.status).toBe(GameState.FINISHED);
+
+      // Trigger cleanup alarm
+      await room.alarm();
+
+      // Verify all tables were wiped
+      const sql = (room as any).sql;
+      expect(sql.exec('SELECT count(*) as cnt FROM answers').toArray()[0].cnt).toBe(0);
+      expect(sql.exec('SELECT count(*) as cnt FROM presence').toArray()[0].cnt).toBe(0);
+      expect(sql.exec('SELECT count(*) as cnt FROM scores').toArray()[0].cnt).toBe(0);
+      expect(sql.exec('SELECT count(*) as cnt FROM rounds').toArray()[0].cnt).toBe(0);
+      expect(sql.exec('SELECT count(*) as cnt FROM players').toArray()[0].cnt).toBe(0);
     });
   });
 });

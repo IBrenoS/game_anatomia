@@ -11,13 +11,15 @@
     "test:e2e": "playwright test",
     "test:load": "tsx tests/load/websocket-load.ts",
     "lint": "eslint .",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && pnpm --filter @batalha/web exec tsc --noEmit",
     "validate-content": "pnpm --filter @batalha/content validate",
-    "check": "pnpm typecheck && pnpm validate-content && pnpm test && pnpm test:integration && pnpm build"
+    "check": "pnpm lint && pnpm typecheck && pnpm validate-content && pnpm test && pnpm test:integration && pnpm build"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
