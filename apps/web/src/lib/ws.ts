@@ -111,7 +111,7 @@ export class WebSocketManager {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      this.send(ClientEventType.CLIENT_ALIVE, { timestamp: Date.now() });
+      this.send(ClientEventType.CLIENT_ALIVE, { clientTime: Date.now() });
     }, 5000);
   }
 
@@ -164,7 +164,7 @@ export class WebSocketManager {
   }
 
   requestSnapshot(): void {
-    this.send(ClientEventType.REQUEST_SNAPSHOT, {});
+    this.send(ClientEventType.REQUEST_SNAPSHOT, { lastRoomVersion: this._roomVersion });
   }
 
   onEvent(type: string, handler: (payload: any, envelope: any) => void): () => void {

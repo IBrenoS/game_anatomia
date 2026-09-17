@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { PublicQuestion } from '@batalha/protocol';
+import { useEffect, useState } from 'react';
+import type { PublicQuestion } from '@batalha/protocol';
 
 interface HostQuestionProps {
   question: PublicQuestion | null;
@@ -8,7 +8,9 @@ interface HostQuestionProps {
   deadlineAt: number | null;
 }
 
-export default function HostQuestion({ question, currentQuestionIndex, startedAt, deadlineAt }: HostQuestionProps) {
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+
+export default function HostQuestion({ question, currentQuestionIndex, deadlineAt }: HostQuestionProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
 
   useEffect(() => {
@@ -25,36 +27,45 @@ export default function HostQuestion({ question, currentQuestionIndex, startedAt
     return () => clearInterval(interval);
   }, [deadlineAt]);
 
-  if (!question) return <div>Loading question...</div>;
+  if (!question) return <div className="text-white text-center py-12">Carregando questão...</div>;
 
   return (
-    <div className="flex flex-col h-full text-white">
+    <div className="flex flex-col h-full text-white max-w-5xl mx-auto w-full">
       <div className="flex justify-between items-center mb-6">
-        <span className="text-xl text-blue-200">Question {currentQuestionIndex + 1}</span>
-        <div className="text-4xl font-mono font-bold bg-black/30 px-6 py-2 rounded-full">
+        <span className="text-lg font-bold bg-blue-900/60 px-4 py-1.5 rounded-full border border-blue-400/30 text-blue-200">
+          Questão {currentQuestionIndex + 1} de 10
+        </span>
+        <div className="text-4xl font-mono font-black bg-black/40 px-6 py-2 rounded-2xl border border-white/10 text-yellow-300">
           {timeLeft}s
         </div>
       </div>
 
-      <h2 className="text-4xl font-bold text-center mb-12">{question.prompt}</h2>
+      <h2 className="text-3xl md:text-4xl font-black text-center mb-6 leading-tight">
+        {question.prompt}
+      </h2>
 
       {question.media && (
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6">
           <img 
             src={question.media.src} 
-            alt={question.media.alt || 'Question media'} 
-            className="max-h-64 object-contain rounded-lg shadow-lg bg-white/5"
+            alt={question.media.alt || 'Ilustração anatômica'} 
+            width={question.media.width || 800}
+            height={question.media.height || 600}
+            className="max-h-64 object-contain rounded-xl shadow-2xl bg-white/5 border border-white/10"
           />
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
-        {question.options.map((option) => (
+        {question.options.map((option, idx) => (
           <div 
             key={option.id}
-            className="bg-white/10 hover:bg-white/20 p-6 rounded-xl text-xl font-semibold border border-white/20 text-center"
+            className="bg-white/10 hover:bg-white/15 p-5 rounded-2xl text-lg font-bold border border-white/15 flex items-center gap-4 shadow-md transition-all"
           >
-            {option.label}
+            <span className="w-9 h-9 rounded-xl bg-blue-600/80 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+              {OPTION_LETTERS[idx] || (idx + 1)}
+            </span>
+            <span className="truncate">{option.label}</span>
           </div>
         ))}
       </div>

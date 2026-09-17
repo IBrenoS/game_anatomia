@@ -163,12 +163,21 @@ export class GameRoom extends DurableObject {
     
     const role = url.searchParams.get('role') || 'player';
     const token = url.searchParams.get('token') || '';
+
+    if (role === 'host') {
+      const tokenHash = await this.hashToken(token);
+      const rows = this.sql.exec('SELECT host_token_hash FROM room WHERE pin = ?', this.room.pin).toArray();
+      if (rows.length === 0 || rows[0].host_token_hash !== tokenHash) {
+        return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
     
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     
     // Tag the WebSocket with metadata
-    this.ctx.acceptWebSocket(server, [role, token]);
+    this.ctx.acceptWebSocket(server, [`role:${role}`]);
+    (server as any).__role = role;
     
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -187,6 +196,18 @@ export class GameRoom extends DurableObject {
       
       const { type, payload, correlationId } = envelope.data;
       this.loadRoom();
+
+      if (!(ws as any).__role) {
+        const tags = this.ctx.getTags(ws);
+        const roleTag = tags.find((t: string) => t.startsWith('role:'));
+        if (roleTag) {
+          (ws as any).__role = roleTag.slice(5);
+        }
+        const playerTag = tags.find((t: string) => t.startsWith('player:'));
+        if (playerTag) {
+          (ws as any).__playerId = playerTag.slice(7);
+        }
+      }
       
       switch (type) {
         case 'JOIN_ROOM':
@@ -410,32 +431,32 @@ export class GameRoom extends DurableObject {
     }
     
     if (!this.room || this.room.status !== GameState.QUESTION_ACTIVE) {
-      this.sendError(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active question', correlationId);
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active question', correlationId);
       return;
     }
     
     const playerId = (ws as any).__playerId as string;
     if (!playerId) {
-      this.sendError(ws, ProtocolError.UNAUTHORIZED, 'Not authenticated');
+      this.sendAnswerRejected(ws, ProtocolError.UNAUTHORIZED, 'Not authenticated', correlationId);
       return;
     }
     
     const now = Date.now();
     const round = this.getCurrentRound();
     if (!round) {
-      this.sendError(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active round');
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active round', correlationId);
       return;
     }
     
     // Check deadline
     if (now > round.deadlineAt) {
-      this.sendError(ws, ProtocolError.DEADLINE_EXCEEDED, 'Deadline exceeded', correlationId);
+      this.sendAnswerRejected(ws, ProtocolError.DEADLINE_EXCEEDED, 'Deadline exceeded', correlationId);
       return;
     }
     
     // Check if paused
     if (round.state === 'paused') {
-      this.sendError(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Question is paused', correlationId);
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Question is paused', correlationId);
       return;
     }
     
@@ -444,13 +465,13 @@ export class GameRoom extends DurableObject {
       'SELECT * FROM players WHERE player_id = ?', playerId
     ).toArray();
     if (playerRows.length === 0) {
-      this.sendError(ws, ProtocolError.UNAUTHORIZED, 'Player not found');
+      this.sendAnswerRejected(ws, ProtocolError.UNAUTHORIZED, 'Player not found', correlationId);
       return;
     }
     const playerData = this.rowToPlayer(playerRows[0]);
     
     if (!isPlayerEligible(playerData, this.room.currentQuestionIndex)) {
-      this.sendError(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Not eligible for this question', correlationId);
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'Not eligible for this question', correlationId);
       return;
     }
     
@@ -461,7 +482,7 @@ export class GameRoom extends DurableObject {
     ).toArray();
     
     if (existing.length > 0) {
-      this.sendError(ws, ProtocolError.ANSWER_ALREADY_SUBMITTED, 'Answer already submitted', correlationId);
+      this.sendAnswerRejected(ws, ProtocolError.ANSWER_ALREADY_SUBMITTED, 'Answer already submitted', correlationId);
       return;
     }
     
@@ -1141,6 +1162,16 @@ export class GameRoom extends DurableObject {
   private sendError(ws: WebSocket, code: string, message: string, correlationId?: string): void {
     const envelope = createServerEnvelope(
       ServerEventType.ERROR,
+      { code, message },
+      this.room?.roomVersion ?? 0,
+      correlationId
+    );
+    ws.send(JSON.stringify(envelope));
+  }
+
+  private sendAnswerRejected(ws: WebSocket, code: string, message: string, correlationId?: string): void {
+    const envelope = createServerEnvelope(
+      ServerEventType.ANSWER_REJECTED,
       { code, message },
       this.room?.roomVersion ?? 0,
       correlationId

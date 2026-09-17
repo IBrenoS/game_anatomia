@@ -1,6 +1,6 @@
-import React from 'react';
-import { PublicQuestion } from '@batalha/protocol';
+import type { PublicQuestion } from '@batalha/protocol';
 import { wsManager } from '../../lib/ws.js';
+import CountdownTimer from './CountdownTimer.js';
 
 interface PlayerQuestionProps {
   question: PublicQuestion | null;
@@ -11,6 +11,14 @@ interface PlayerQuestionProps {
   answerSubmitted: boolean;
 }
 
+const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
+const OPTION_COLORS = [
+  'bg-blue-600 hover:bg-blue-500 active:bg-blue-700 border-blue-400',
+  'bg-amber-600 hover:bg-amber-500 active:bg-amber-700 border-amber-400',
+  'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 border-emerald-400',
+  'bg-purple-600 hover:bg-purple-500 active:bg-purple-700 border-purple-400'
+];
+
 export default function PlayerQuestion({ 
   question, 
   currentQuestionIndex,
@@ -20,55 +28,83 @@ export default function PlayerQuestion({
   answerSubmitted 
 }: PlayerQuestionProps) {
   
-  if (!question) return <div className="text-white text-center mt-12">Loading...</div>;
+  if (!question) return <div className="text-white text-center py-12">Carregando pergunta...</div>;
 
   const handleSelectOption = (optionId: string) => {
     if (answerSubmitted) return;
-    
-    // Optimistically update store via WS manager action which will be dispatched
     wsManager.submitAnswer(question.id, wsManager.roomVersion, optionId);
   };
 
   if (answerSubmitted) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-white">
-        <div className="w-24 h-24 bg-blue-500 rounded-full flex items-center justify-center mb-8 animate-bounce">
-          <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <div className="flex-1 flex flex-col items-center justify-center text-white p-6 text-center animate-[fadeIn_0.3s_ease-out]">
+        <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_25px_rgba(34,197,94,0.5)]">
+          <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-3xl font-bold mb-4">Answer submitted!</h2>
-        <p className="text-blue-200">Waiting for other players...</p>
+        <h2 className="text-2xl md:text-3xl font-black mb-2 text-green-300">Resposta Enviada!</h2>
+        <p className="text-base text-blue-200 max-w-xs">
+          Aguarde todos os participantes responderem ou o encerramento do prazo.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="text-white text-center mb-6 text-sm font-bold opacity-70">
-        QUESTION {currentQuestionIndex + 1}
+    <div className="flex flex-col h-full max-w-lg mx-auto w-full justify-between">
+      <div>
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs font-bold text-blue-200 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-400/30 uppercase tracking-wider">
+            Questão {currentQuestionIndex + 1} de 10
+          </span>
+          <span className="text-xs font-bold text-yellow-300">
+            {question.basePoints} pontos base
+          </span>
+        </div>
+
+        <CountdownTimer deadlineAt={deadlineAt} startedAt={startedAt} />
+
+        <h2 className="text-lg md:text-xl font-bold text-white mt-3 mb-4 leading-snug">
+          {question.prompt}
+        </h2>
+
+        {question.media && (
+          <div className="flex justify-center mb-4">
+            <img 
+              src={question.media.src} 
+              alt={question.media.alt || 'Ilustração anatômica'} 
+              width={question.media.width || 800}
+              height={question.media.height || 600}
+              className="max-h-40 object-contain rounded-xl shadow-lg border border-white/10 bg-black/20"
+            />
+          </div>
+        )}
       </div>
       
-      <div className="grid grid-cols-1 gap-4 flex-1">
+      <div className="grid grid-cols-1 gap-3.5 my-auto pb-4">
         {question.options.map((option, index) => {
-          const colors = [
-            'bg-red-500 active:bg-red-600', 
-            'bg-blue-500 active:bg-blue-600', 
-            'bg-yellow-500 active:bg-yellow-600', 
-            'bg-green-500 active:bg-green-600'
-          ];
-          const bgColor = colors[index % colors.length];
+          const colorClass = OPTION_COLORS[index % OPTION_COLORS.length];
+          const letter = OPTION_LETTERS[index] || (index + 1);
           const isSelected = selectedOptionId === option.id;
 
           return (
             <button
               key={option.id}
+              type="button"
               onClick={() => handleSelectOption(option.id)}
               disabled={answerSubmitted}
-              className={`${bgColor} ${isSelected ? 'ring-4 ring-white shadow-[0_0_15px_rgba(255,255,255,0.5)] scale-[1.02]' : ''} 
-                text-white p-6 rounded-xl text-2xl font-bold shadow-lg transition-all duration-200 flex items-center justify-center border-b-4 border-black/20`}
+              className={`${colorClass} ${
+                isSelected ? 'ring-4 ring-white scale-[1.02] shadow-2xl' : ''
+              } text-white min-h-[58px] p-4 rounded-2xl text-left font-bold shadow-lg transition-all active:scale-98 flex items-center gap-3.5 border-b-4 border-black/30 cursor-pointer`}
+              aria-label={`Alternativa ${letter}: ${option.label}`}
             >
-              {option.label}
+              <span className="w-9 h-9 rounded-xl bg-black/25 text-white flex items-center justify-center font-black text-lg shrink-0 border border-white/20 shadow-inner">
+                {letter}
+              </span>
+              <span className="text-base md:text-lg leading-tight flex-1">
+                {option.label}
+              </span>
             </button>
           );
         })}

@@ -1,4 +1,9 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
+import PlayerList from './PlayerList.js';
+import ConfirmDialog from '../shared/ConfirmDialog.js';
+import { wsManager } from '../../lib/ws.js';
+import { useGameStore } from '../../stores/gameStore.js';
 
 interface HostLobbyProps {
   players: Array<{ playerId: string; nickname: string; joinedAt: number }>;
@@ -7,47 +12,92 @@ interface HostLobbyProps {
 }
 
 export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [playerToRemove, setPlayerToRemove] = useState<{ id: string; nickname: string } | null>(null);
+  const entryLocked = useGameStore(s => s.entryLocked);
+  const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}/join/${pin}` : '';
+
+  useEffect(() => {
+    if (joinUrl) {
+      QRCode.toDataURL(joinUrl, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
+      }).then(setQrDataUrl).catch(console.error);
+    }
+  }, [joinUrl]);
+
+  const handleToggleLock = () => {
+    const command = entryLocked ? 'UNLOCK_ENTRIES' : 'LOCK_ENTRIES';
+    wsManager.sendHostCommand(command, wsManager.roomVersion);
+  };
+
+  const handleConfirmRemove = () => {
+    if (!playerToRemove) return;
+    wsManager.sendHostCommand('REMOVE_PLAYER', wsManager.roomVersion, { playerId: playerToRemove.id });
+    setPlayerToRemove(null);
+  };
+
   return (
-    <div className="flex flex-col h-full text-white">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-3xl font-bold mb-2">Join the game!</h2>
-          <div className="text-5xl font-mono tracking-widest bg-white/10 px-6 py-4 rounded-lg inline-block">
+    <div className="flex flex-col h-full text-white max-w-5xl mx-auto w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start mb-8">
+        <div className="bg-black/25 p-6 rounded-2xl border border-white/10 flex flex-col items-center text-center">
+          <h2 className="text-xl text-blue-200 font-semibold mb-2">PIN DA SALA</h2>
+          <div className="text-6xl font-black tracking-widest text-yellow-300 font-mono mb-4 select-all">
             {pin}
           </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-lg">
-          {/* QR Code placeholder */}
-          <div className="w-32 h-32 bg-gray-200 flex items-center justify-center text-gray-800 text-sm font-bold">
-            QR CODE
+          <p className="text-sm text-blue-300 mb-6">
+            Acesse pelo celular: <span className="font-mono text-white font-bold">{joinUrl}</span>
+          </p>
+
+          <div className="flex gap-3 w-full">
+            <button
+              type="button"
+              onClick={handleToggleLock}
+              className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all shadow-md ${
+                entryLocked
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                  : 'bg-slate-700 hover:bg-slate-600 text-blue-200'
+              }`}
+            >
+              {entryLocked ? '🔓 Liberar Novas Entradas' : '🔒 Bloquear Entradas'}
+            </button>
           </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center justify-center text-slate-900 text-center">
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt={`QR Code para entrar na sala ${pin}`} className="w-56 h-56 rounded-lg mb-3 shadow-inner" />
+          ) : (
+            <div className="w-56 h-56 bg-slate-100 flex items-center justify-center rounded-lg mb-3">
+              <span className="text-sm text-slate-500">Gerando QR Code...</span>
+            </div>
+          )}
+          <p className="text-sm font-bold text-slate-700">Aponte a câmera para entrar no jogo</p>
         </div>
       </div>
 
-      <div className="flex-1 bg-black/20 rounded-xl p-6 overflow-y-auto">
-        <h3 className="text-xl font-semibold mb-4">Players ({players.length})</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {players.map(player => {
-            const presence = presences.find(p => p.playerId === player.playerId);
-            const isConnected = presence ? presence.connected : false;
-            
-            return (
-              <div 
-                key={player.playerId}
-                className={`p-3 rounded-lg flex items-center gap-3 ${isConnected ? 'bg-blue-600' : 'bg-gray-600 opacity-70'}`}
-              >
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                <span className="font-medium truncate">{player.nickname}</span>
-              </div>
-            );
-          })}
-        </div>
-        {players.length === 0 && (
-          <div className="text-center text-white/50 py-12">
-            Waiting for players to join...
-          </div>
-        )}
+      <div className="flex-1 bg-black/20 rounded-2xl p-6 border border-white/10 flex flex-col">
+        <PlayerList
+          players={players}
+          presences={presences}
+          onRemovePlayer={(id, nickname) => setPlayerToRemove({ id, nickname })}
+        />
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(playerToRemove)}
+        title="Remover Participante"
+        message={`Deseja realmente remover "${playerToRemove?.nickname}" da partida? A sessão do participante será encerrada imediatamente.`}
+        confirmText="Sim, Remover"
+        cancelText="Cancelar"
+        isDestructive={true}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setPlayerToRemove(null)}
+      />
     </div>
   );
 }

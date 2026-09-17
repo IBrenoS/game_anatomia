@@ -1,5 +1,4 @@
-import React from 'react';
-import { RankingEntry } from '@batalha/protocol';
+import type { RankingEntry } from '@batalha/protocol';
 
 interface PlayerFinishedProps {
   ranking?: RankingEntry;
@@ -7,21 +6,36 @@ interface PlayerFinishedProps {
 
 export default function PlayerFinished({ ranking }: PlayerFinishedProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-white text-center">
-      <h2 className="text-4xl font-bold mb-6">Game Over</h2>
+    <div className="flex-1 flex flex-col items-center justify-center text-white text-center p-6 max-w-sm mx-auto">
+      <div className="text-6xl mb-4">🏁</div>
+      <h2 className="text-3xl font-black mb-2 text-white">Partida Finalizada</h2>
+      <p className="text-sm text-blue-200 mb-6">
+        Obrigado por participar da Batalha Anatômica!
+      </p>
+
       {ranking && (
-        <div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
-          <div className="text-sm uppercase tracking-widest opacity-70 mb-1">Final Position</div>
-          <div className="text-6xl font-black mb-4">#{ranking.position}</div>
-          <div className="text-sm uppercase tracking-widest opacity-70 mb-1">Final Score</div>
-          <div className="text-3xl font-mono font-bold text-yellow-400">{ranking.totalPoints}</div>
+        <div className="w-full bg-black/35 p-6 rounded-3xl border border-white/15 mb-8 shadow-xl">
+          <div className="text-xs uppercase tracking-widest text-blue-300 font-bold mb-1">
+            Posição Final
+          </div>
+          <div className="text-6xl font-black mb-4 font-mono text-white">
+            #{ranking.position}
+          </div>
+          <div className="text-xs uppercase tracking-widest text-blue-300 font-bold mb-1">
+            Pontuação Conquistada
+          </div>
+          <div className="text-3xl font-mono font-black text-yellow-300">
+            {ranking.totalPoints} pts
+          </div>
         </div>
       )}
+
       <button 
-        onClick={() => window.location.href = '/'}
-        className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg transition-colors"
+        type="button"
+        onClick={() => { window.location.href = '/'; }}
+        className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold rounded-2xl shadow-xl transition-all cursor-pointer text-lg"
       >
-        Play Again
+        Voltar ao Início
       </button>
     </div>
   );
