@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #1e3a5f;
+  --color-secondary: #6b46c1;
+  --color-accent: #3b82f6;
+  --color-correct: #22c55e;
+  --color-incorrect: #ef4444;
+  --color-warning: #f59e0b;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-primary);
+  color: white;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}

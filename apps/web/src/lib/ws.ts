@@ -1,0 +1,193 @@
+import { createClientEnvelope, EventEnvelopeSchema, ClientEventType } from '@batalha/protocol';
+
+export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+
+export class WebSocketManager {
+  private ws: WebSocket | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
+  private maxReconnectDelay = 30000;
+  private _state: ConnectionState = 'disconnected';
+  private _roomVersion = 0;
+  private handlers = new Map<string, Set<(payload: any, envelope: any) => void>>();
+  private stateHandlers = new Set<(state: ConnectionState) => void>();
+  private currentPin: string | null = null;
+  private currentRole: string | null = null;
+  private currentToken: string | undefined;
+
+  get state(): ConnectionState { return this._state; }
+  get roomVersion(): number { return this._roomVersion; }
+
+  private setState(newState: ConnectionState) {
+    if (this._state !== newState) {
+      this._state = newState;
+      this.stateHandlers.forEach(handler => handler(newState));
+    }
+  }
+
+  connect(pin: string, role: string, token?: string): void {
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    this.currentPin = pin;
+    this.currentRole = role;
+    this.currentToken = token;
+
+    this.setState(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
+
+    const url = new URL(`/api/rooms/${pin}/ws`, window.location.origin);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.searchParams.set('role', role);
+    if (token) {
+      url.searchParams.set('token', token);
+    }
+
+    this.ws = new WebSocket(url.toString());
+
+    this.ws.onopen = () => {
+      this.setState('connected');
+      this.reconnectAttempt = 0;
+      this.startHeartbeat();
+    };
+
+    this.ws.onclose = () => {
+      this.stopHeartbeat();
+      this.ws = null;
+      if (this._state !== 'disconnected') {
+        this.scheduleReconnect();
+      }
+    };
+
+    this.ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const rawData = JSON.parse(event.data);
+        const parsed = EventEnvelopeSchema.safeParse(rawData);
+        
+        if (!parsed.success) {
+          console.error('Invalid message format received:', parsed.error);
+          return;
+        }
+
+        const envelope = parsed.data;
+        // Skip internal keep-alive responses
+        if (envelope.type === 'PONG') return;
+        
+        if ('roomVersion' in envelope && typeof envelope.roomVersion === 'number') {
+           this._roomVersion = envelope.roomVersion;
+        }
+
+        const typeHandlers = this.handlers.get(envelope.type);
+        if (typeHandlers) {
+          typeHandlers.forEach(handler => handler(envelope.payload, envelope));
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+  }
+
+  disconnect(): void {
+    this.setState('disconnected');
+    this.stopHeartbeat();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+    this.currentPin = null;
+    this.currentRole = null;
+    this.currentToken = undefined;
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      this.send(ClientEventType.CLIENT_ALIVE, { timestamp: Date.now() });
+    }, 5000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this._state === 'disconnected') return;
+    
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempt), this.maxReconnectDelay);
+    this.reconnectAttempt++;
+    
+    this.setState('reconnecting');
+    this.reconnectTimer = setTimeout(() => {
+      if (this.currentPin && this.currentRole) {
+        this.connect(this.currentPin, this.currentRole, this.currentToken);
+      }
+    }, delay);
+  }
+
+  send(type: string, payload: unknown, correlationId?: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('Cannot send message, WebSocket is not open');
+      return;
+    }
+
+    const envelope = createClientEnvelope(type, payload, this._roomVersion, correlationId);
+    this.ws.send(JSON.stringify(envelope));
+  }
+
+  // Action Helpers
+  joinRoom(pin: string, nickname: string): void {
+    this.send(ClientEventType.JOIN_ROOM, { pin, nickname });
+  }
+
+  resumeSession(pin: string, reconnectToken: string): void {
+    this.send(ClientEventType.RESUME_SESSION, { pin, reconnectToken });
+  }
+
+  submitAnswer(questionId: string, questionVersion: number, optionId: string): void {
+    this.send(ClientEventType.SUBMIT_ANSWER, { questionId, questionVersion, optionId });
+  }
+
+  sendHostCommand(command: string, expectedRoomVersion: number, data?: Record<string, unknown>): void {
+    this.send(ClientEventType.HOST_COMMAND, { command, expectedRoomVersion, data });
+  }
+
+  requestSnapshot(): void {
+    this.send(ClientEventType.REQUEST_SNAPSHOT, {});
+  }
+
+  onEvent(type: string, handler: (payload: any, envelope: any) => void): () => void {
+    if (!this.handlers.has(type)) {
+      this.handlers.set(type, new Set());
+    }
+    this.handlers.get(type)!.add(handler);
+    
+    return () => {
+      const typeHandlers = this.handlers.get(type);
+      if (typeHandlers) {
+        typeHandlers.delete(handler);
+      }
+    };
+  }
+
+  onStateChange(handler: (state: ConnectionState) => void): () => void {
+    this.stateHandlers.add(handler);
+    return () => {
+      this.stateHandlers.delete(handler);
+    };
+  }
+}
+
+// Singleton
+export const wsManager = new WebSocketManager();
