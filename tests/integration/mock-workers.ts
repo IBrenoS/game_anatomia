@@ -88,6 +88,23 @@ export class MockWebSocketPair {
 // Ensure WebSocketPair is globally available for Workers code
 (globalThis as any).WebSocketPair = MockWebSocketPair;
 
+export class MockWebSocketRequestResponsePair {
+  constructor(
+    private readonly request: string,
+    private readonly response: string,
+  ) {}
+
+  getRequest(): string {
+    return this.request;
+  }
+
+  getResponse(): string {
+    return this.response;
+  }
+}
+
+(globalThis as any).WebSocketRequestResponsePair = MockWebSocketRequestResponsePair;
+
 export class MockSqlStorage {
   db: any;
 
@@ -137,6 +154,8 @@ export class MockDurableObjectStorage {
 export class MockDurableObjectState {
   storage: MockDurableObjectStorage;
   sockets: Set<MockWebSocket> = new Set();
+  private autoResponse: MockWebSocketRequestResponsePair | null = null;
+  private autoResponseTimestamps = new WeakMap<MockWebSocket, Date>();
 
   constructor() {
     this.storage = new MockDurableObjectStorage();
@@ -156,6 +175,28 @@ export class MockDurableObjectState {
   getWebSockets(tag?: string): MockWebSocket[] {
     if (!tag) return Array.from(this.sockets);
     return Array.from(this.sockets).filter(ws => ws.tags?.includes(tag));
+  }
+
+  setWebSocketAutoResponse(pair?: MockWebSocketRequestResponsePair) {
+    this.autoResponse = pair ?? null;
+  }
+
+  getWebSocketAutoResponse(): MockWebSocketRequestResponsePair | null {
+    return this.autoResponse;
+  }
+
+  getWebSocketAutoResponseTimestamp(ws: MockWebSocket): Date | null {
+    return this.autoResponseTimestamps.get(ws) ?? null;
+  }
+
+  simulateWebSocketMessage(ws: MockWebSocket, message: string, receivedAt = Date.now()): boolean {
+    if (!this.autoResponse || this.autoResponse.getRequest() !== message) {
+      return false;
+    }
+
+    this.autoResponseTimestamps.set(ws, new Date(receivedAt));
+    ws.send(this.autoResponse.getResponse());
+    return true;
   }
 
   setAlarm(timestamp: number) {

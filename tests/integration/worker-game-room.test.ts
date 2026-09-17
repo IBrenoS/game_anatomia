@@ -174,6 +174,13 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
   });
 
   describe('P0.1 WebSocket Upgrade & Immediate Snapshot', () => {
+    it('configures hibernation-safe automatic ping/pong without waking the Durable Object', () => {
+      const autoResponse = ctx.getWebSocketAutoResponse();
+
+      expect(autoResponse?.getRequest()).toBe('ping');
+      expect(autoResponse?.getResponse()).toBe('pong');
+    });
+
     it('sends immediate SNAPSHOT to newly connected host with query token', async () => {
       const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, {
         headers: { Upgrade: 'websocket' },
@@ -345,6 +352,58 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const errorMsg = pClient.getAllMessages().find(m => m.type === ServerEventType.ERROR);
       expect(errorMsg).toBeDefined();
       expect(errorMsg.payload.code).toBe(ProtocolError.UNAUTHORIZED);
+    });
+
+    it('keeps legacy heartbeat compatibility without persisting each heartbeat', async () => {
+      const playerReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(playerReq);
+      const playerServer = ctx.getWebSockets('role:player')[0];
+      const playerClient = attachTestClient(room, playerServer, playerServer.peer!);
+      await playerClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+
+      const sql = (room as any).sql;
+      const before = sql.exec('SELECT last_seen_at FROM presence LIMIT 1').toArray()[0].last_seen_at;
+
+      const realNow = Date.now;
+      Date.now = () => before + 5_000;
+      try {
+        await playerClient.send(createClientEnvelope('CLIENT_ALIVE', { clientTime: before + 5_000 }, 0));
+      } finally {
+        Date.now = realNow;
+      }
+
+      const after = sql.exec('SELECT last_seen_at FROM presence LIMIT 1').toArray()[0].last_seen_at;
+      expect(after).toBe(before);
+    });
+
+    it('uses the automatic heartbeat timestamp when deciding whether every active player answered', async () => {
+      const playerReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(playerReq);
+      const playerServer = ctx.getWebSockets('role:player')[0];
+      const playerClient = attachTestClient(room, playerServer, playerServer.peer!);
+      await playerClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+
+      const joinedAt = (room as any).sql.exec('SELECT last_seen_at FROM presence LIMIT 1').toArray()[0].last_seen_at;
+      const heartbeatAt = joinedAt + 15_000;
+      expect(ctx.simulateWebSocketMessage(playerServer, 'ping', heartbeatAt)).toBe(true);
+
+      const realNow = Date.now;
+      Date.now = () => heartbeatAt;
+      try {
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: 9999 }, 0));
+        await room.alarm();
+
+        const question = questions[0];
+        await playerClient.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: question.id,
+          questionVersion: 0,
+          optionId: question.correctOptionId,
+        }, 0));
+
+        expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+      } finally {
+        Date.now = realNow;
+      }
     });
   });
 

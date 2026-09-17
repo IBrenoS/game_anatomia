@@ -19,6 +19,10 @@ export const COUNTDOWN_DURATION_MS = 3_000;
 /** PRD p.10: Heartbeat interval for presence */
 export const HEARTBEAT_INTERVAL_MS = 5_000;
 
+/** Static heartbeat frames handled by the Durable Object auto-response API. */
+export const HEARTBEAT_PING_FRAME = 'ping';
+export const HEARTBEAT_PONG_FRAME = 'pong';
+
 /** PRD p.10: Presence timeout (inactive after 10s without signal) */
 export const PRESENCE_TIMEOUT_MS = 10_000;
 

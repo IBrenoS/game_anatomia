@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "pnpm --filter @batalha/web dev",
     "build": "pnpm -r build",
+    "deploy": "pnpm --filter @batalha/web exec wrangler deploy",
+    "deploy:preview": "pnpm --filter @batalha/web exec wrangler versions upload",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config tests/vitest.integration.config.ts",

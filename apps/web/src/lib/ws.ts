@@ -1,4 +1,11 @@
-import { createClientEnvelope, EventEnvelopeSchema, ClientEventType } from '@batalha/protocol';
+import {
+  createClientEnvelope,
+  EventEnvelopeSchema,
+  ClientEventType,
+  HEARTBEAT_INTERVAL_MS,
+  HEARTBEAT_PING_FRAME,
+  HEARTBEAT_PONG_FRAME,
+} from '@batalha/protocol';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
 
@@ -76,6 +83,8 @@ export class WebSocketManager {
     };
 
     this.ws.onmessage = (event) => {
+      if (event.data === HEARTBEAT_PONG_FRAME) return;
+
       try {
         const rawData = JSON.parse(event.data);
         const parsed = EventEnvelopeSchema.safeParse(rawData);
@@ -156,8 +165,10 @@ export class WebSocketManager {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
-      this.send(ClientEventType.CLIENT_ALIVE, { clientTime: Date.now() });
-    }, 5000);
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(HEARTBEAT_PING_FRAME);
+      }
+    }, HEARTBEAT_INTERVAL_MS);
   }
 
   private stopHeartbeat(): void {

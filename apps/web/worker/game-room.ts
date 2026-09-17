@@ -4,6 +4,7 @@ import {
   AnswerData, ScoreData, RoundData, RoomData, RankingEntry,
   MAX_PLAYERS_PER_ROOM, SPEED_BONUS_WINDOW_MS, PRESENCE_TIMEOUT_MS,
   ROOM_EXPIRY_MS, COUNTDOWN_DURATION_MS, TOTAL_QUESTIONS,
+  HEARTBEAT_PING_FRAME, HEARTBEAT_PONG_FRAME,
   HostCommandType, ProtocolError, ServerEventType, ClientEventType,
   createServerEnvelope,
   JoinRoomSchema, ResumeSessionSchema, SubmitAnswerSchema,
@@ -21,6 +22,7 @@ export interface ConnectionMeta {
   role: string;
   playerId?: string;
   connectionId?: string;
+  lastSeenAt?: number;
 }
 
 export class GameRoom extends DurableObject {
@@ -32,6 +34,9 @@ export class GameRoom extends DurableObject {
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
     this.sql = ctx.storage.sql;
+    this.ctx.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair(HEARTBEAT_PING_FRAME, HEARTBEAT_PONG_FRAME),
+    );
     this.initSchema();
   }
 
@@ -410,7 +415,7 @@ export class GameRoom extends DurableObject {
     this.incrementVersion();
     
     // Store player-ws mapping via hibernation attachment and memory cache (P0.4)
-    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId });
+    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId, lastSeenAt: now });
     
     // Send SESSION_ACCEPTED to the player
     const sessionEvent = createServerEnvelope(
@@ -475,7 +480,7 @@ export class GameRoom extends DurableObject {
     );
     
     // Store player-ws mapping via hibernation attachment and memory cache (P0.4)
-    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId });
+    this.setConnectionMeta(ws, { role: 'player', playerId, connectionId, lastSeenAt: now });
     
     this.incrementVersion();
     
@@ -638,14 +643,14 @@ export class GameRoom extends DurableObject {
   }
 
   private handleClientAlive(ws: WebSocket, payload: unknown): void {
-    const playerId = this.getConnectionMeta(ws).playerId;
-    if (!playerId) return;
-    
-    const now = Date.now();
-    this.sql.exec(
-      'UPDATE presence SET last_seen_at = ?, connected = 1 WHERE player_id = ?',
-      now, playerId
-    );
+    if (!ClientAliveSchema.safeParse(payload).success) return;
+
+    const meta = this.getConnectionMeta(ws);
+    if (!meta.playerId) return;
+
+    // Backward compatibility for clients from a previous deployment. Keep the
+    // liveness timestamp in the hibernation attachment instead of SQLite.
+    this.setConnectionMeta(ws, { lastSeenAt: Date.now() });
   }
 
   private async handleHostCommand(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
@@ -1089,6 +1094,27 @@ export class GameRoom extends DurableObject {
     }));
   }
 
+  private getEffectivePresences(now = Date.now()): PresenceData[] {
+    const playerSockets = this.getWebSocketsByRole('player');
+
+    return this.getPresences().map(presence => {
+      if (!presence.connected) return presence;
+
+      const ws = playerSockets.find(socket => this.getConnectionMeta(socket).playerId === presence.playerId);
+      if (!ws) return { ...presence, connected: false };
+
+      const metaLastSeenAt = this.getConnectionMeta(ws).lastSeenAt ?? 0;
+      const autoResponseLastSeenAt = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
+      const lastSeenAt = Math.max(presence.lastSeenAt, metaLastSeenAt, autoResponseLastSeenAt);
+
+      return {
+        ...presence,
+        lastSeenAt,
+        connected: isPlayerActive({ ...presence, lastSeenAt }, now),
+      };
+    });
+  }
+
   private computeRanking(): RankingEntry[] {
     const scores = this.getScores();
     const players = this.getActivePlayers();
@@ -1120,10 +1146,10 @@ export class GameRoom extends DurableObject {
     if (!round || round.state !== 'active') return;
     
     const question = questions[this.room.currentQuestionIndex];
-    const players = this.getActivePlayers();
-    const presences = this.getPresences();
-    const answers = this.getAnswersForQuestion(question.id);
     const now = Date.now();
+    const players = this.getActivePlayers();
+    const presences = this.getEffectivePresences(now);
+    const answers = this.getAnswersForQuestion(question.id);
     
     const eligibleActivePlayers = players.filter(p => {
       if (!isPlayerEligible(p, this.room!.currentQuestionIndex)) return false;
@@ -1222,7 +1248,7 @@ export class GameRoom extends DurableObject {
       eligibleFromQuestion: p.eligibleFromQuestion,
     }));
     
-    const presences = this.getPresences().map(p => ({
+    const presences = this.getEffectivePresences().map(p => ({
       playerId: p.playerId,
       connected: p.connected,
     }));
