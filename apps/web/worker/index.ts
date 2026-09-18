@@ -102,7 +102,8 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const secureFlag = isSecure ? '; Secure' : '';
     headers.set('Set-Cookie', `batalha_host_${pin}=${hostToken}; Path=/; HttpOnly; SameSite=Strict${secureFlag}`);
 
-    return Response.json({ pin, joinUrl, hostToken }, {
+    // P1.15: Do NOT expose hostToken in JSON body! Only in HttpOnly cookie.
+    return Response.json({ pin, joinUrl }, {
       status: 201,
       headers,
     });

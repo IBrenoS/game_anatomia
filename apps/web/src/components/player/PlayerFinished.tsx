@@ -1,10 +1,22 @@
 import type { RankingEntry } from '@batalha/protocol';
+import { useGameStore } from '../../stores/gameStore.js';
+import { wsManager } from '../../lib/ws.js';
 
 interface PlayerFinishedProps {
   ranking?: RankingEntry;
 }
 
 export default function PlayerFinished({ ranking }: PlayerFinishedProps) {
+  const handleExit = () => {
+    const pin = useGameStore.getState().pin;
+    if (pin) {
+      localStorage.removeItem(`batalha_session_${pin}`);
+    }
+    wsManager.disconnect();
+    useGameStore.getState().resetStore();
+    window.location.href = '/';
+  };
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-white text-center p-6 max-w-sm mx-auto">
       <div className="text-6xl mb-4">🏁</div>
@@ -32,7 +44,7 @@ export default function PlayerFinished({ ranking }: PlayerFinishedProps) {
 
       <button 
         type="button"
-        onClick={() => { window.location.href = '/'; }}
+        onClick={handleExit}
         className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold rounded-2xl shadow-xl transition-all cursor-pointer text-lg"
       >
         Voltar ao Início

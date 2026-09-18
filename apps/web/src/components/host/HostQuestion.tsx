@@ -32,9 +32,15 @@ export default function HostQuestion({ question, currentQuestionIndex, deadlineA
   return (
     <div className="flex flex-col h-full text-white max-w-5xl mx-auto w-full">
       <div className="flex justify-between items-center mb-6">
-        <span className="text-lg font-bold bg-blue-900/60 px-4 py-1.5 rounded-full border border-blue-400/30 text-blue-200">
-          Questão {currentQuestionIndex + 1} de 10
-        </span>
+        {currentQuestionIndex === 9 ? (
+          <span className="text-lg font-black text-amber-950 bg-gradient-to-r from-yellow-400 to-amber-500 px-4 py-1.5 rounded-full border border-yellow-300 shadow-md animate-pulse uppercase tracking-wider">
+            🔥 DESAFIO FINAL · Questão 10 de 10
+          </span>
+        ) : (
+          <span className="text-lg font-bold bg-blue-900/60 px-4 py-1.5 rounded-full border border-blue-400/30 text-blue-200">
+            Questão {currentQuestionIndex + 1} de 10
+          </span>
+        )}
         <div className="text-4xl font-mono font-black bg-black/40 px-6 py-2 rounded-2xl border border-white/10 text-yellow-300">
           {timeLeft}s
         </div>

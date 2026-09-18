@@ -1,9 +1,10 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
-  GameState, Question, PublicQuestion, PlayerData, PresenceData,
+  GameState, Question, PublicQuestion, PlayerData, PresenceData, PlayerPresenceStatus,
   AnswerData, ScoreData, RoundData, RoomData, RankingEntry,
   MAX_PLAYERS_PER_ROOM, SPEED_BONUS_WINDOW_MS, PRESENCE_TIMEOUT_MS,
   ROOM_EXPIRY_MS, COUNTDOWN_DURATION_MS, TOTAL_QUESTIONS,
+  REVEAL_DURATION_MS, ROUND_RANKING_DURATION_MS, FINAL_RANKING_DURATION_MS, PODIUM_DURATION_MS,
   HEARTBEAT_PING_FRAME, HEARTBEAT_PONG_FRAME,
   HostCommandType, ProtocolError, ServerEventType, ClientEventType,
   createServerEnvelope,
@@ -15,6 +16,7 @@ import {
   calculatePoints, buildRanking, canTransition, assertTransition,
   toPublicQuestion, isPlayerEligible, isPlayerActive,
   normalizeNickname, isNicknameUnique, shouldQuestionEnd,
+  getPlayerPresenceStatus, getRoomPlayerCounts,
 } from '@batalha/game';
 import { questions } from '@batalha/content';
 
@@ -95,6 +97,7 @@ export class GameRoom extends DurableObject {
         pin TEXT PRIMARY KEY,
         status TEXT NOT NULL DEFAULT 'LOBBY',
         room_version INTEGER NOT NULL DEFAULT 0,
+        last_state_version INTEGER NOT NULL DEFAULT 0,
         entry_locked INTEGER NOT NULL DEFAULT 0,
         current_question_index INTEGER NOT NULL DEFAULT -1,
         created_at INTEGER NOT NULL,
@@ -158,6 +161,7 @@ export class GameRoom extends DurableObject {
       );
     `);
 
+    try { this.sql.exec('ALTER TABLE room ADD COLUMN last_state_version INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
     try { this.sql.exec('ALTER TABLE rounds ADD COLUMN accumulated_active_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
     try { this.sql.exec('ALTER TABLE answers ADD COLUMN response_time_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
   }
@@ -196,8 +200,8 @@ export class GameRoom extends DurableObject {
     const hostTokenHash = await this.hashToken(hostToken);
     
     this.sql.exec(
-      `INSERT INTO room (pin, status, room_version, entry_locked, current_question_index, created_at, expires_at, host_token_hash)
-       VALUES (?, 'LOBBY', 0, 0, -1, ?, ?, ?)`,
+      `INSERT INTO room (pin, status, room_version, last_state_version, entry_locked, current_question_index, created_at, expires_at, host_token_hash)
+       VALUES (?, 'LOBBY', 0, 0, 0, -1, ?, ?, ?)`,
       pin, now, now + ROOM_EXPIRY_MS, hostTokenHash
     );
     
@@ -338,12 +342,28 @@ export class GameRoom extends DurableObject {
     this.loadRoom();
     if (!this.room) return;
     
-    if (this.room.status === GameState.QUESTION_ACTIVE) {
-      this.endCurrentQuestion('deadline');
-    } else if (this.room.status === GameState.COUNTDOWN) {
-      this.startQuestion();
-    } else if (this.room.status === GameState.FINISHED) {
-      this.cleanupRoom();
+    switch (this.room.status) {
+      case GameState.COUNTDOWN:
+        this.startQuestion();
+        break;
+      case GameState.QUESTION_ACTIVE:
+        this.endCurrentQuestion('deadline');
+        break;
+      case GameState.QUESTION_REVEAL:
+        this.handleShowRanking();
+        break;
+      case GameState.ROUND_RANKING:
+        this.handleNextQuestion();
+        break;
+      case GameState.FINAL_RANKING:
+        this.handleStartPodium();
+        break;
+      case GameState.PODIUM:
+        this.handleEndGame();
+        break;
+      case GameState.FINISHED:
+        this.cleanupRoom();
+        break;
     }
   }
 
@@ -549,10 +569,14 @@ export class GameRoom extends DurableObject {
       return;
     }
 
-    // Validate questionVersion (P0.6)
+    // Validate questionVersion (P0.6, P0.7)
     const currentQIndex = this.room.currentQuestionIndex;
     if (parsed.data.questionVersion < currentQIndex) {
       this.sendAnswerRejected(ws, ProtocolError.STALE_VERSION, 'Stale question version', correlationId);
+      return;
+    }
+    if (parsed.data.questionVersion > currentQIndex) {
+      this.sendAnswerRejected(ws, ProtocolError.INVALID_PAYLOAD, 'Future question version not allowed', correlationId);
       return;
     }
 
@@ -638,6 +662,46 @@ export class GameRoom extends DurableObject {
     );
     ws.send(JSON.stringify(acceptedEvent));
     
+    // P0.12 & P0.13: Broadcast progress without answer leaks
+    const allAnswers = this.getAnswersForQuestion(parsed.data.questionId);
+    const activePlayers = this.getActivePlayers();
+    const presences = this.getEffectivePresences(now);
+    const counts = getRoomPlayerCounts(activePlayers, presences, this.room.currentQuestionIndex, now);
+
+    // Host receives distribution counts (NO correct answer highlight)
+    const hostDistribution = question.options.map(opt => {
+      const count = allAnswers.filter(a => a.optionId === opt.id).length;
+      return {
+        optionId: opt.id,
+        count,
+        percentage: allAnswers.length > 0 ? Math.round((count / allAnswers.length) * 100) : 0,
+      };
+    });
+
+    this.broadcastByRole('host', createServerEnvelope(
+      ServerEventType.ROUND_PROGRESS,
+      {
+        questionId: parsed.data.questionId,
+        answeredCount: allAnswers.length,
+        totalEligible: counts.eligiblePlayers,
+        distribution: hostDistribution,
+      },
+      this.room!.roomVersion
+    ));
+
+    // Screen and Players receive count only (NO distribution!)
+    const publicProgress = createServerEnvelope(
+      ServerEventType.ROUND_PROGRESS,
+      {
+        questionId: parsed.data.questionId,
+        answeredCount: allAnswers.length,
+        totalEligible: counts.eligiblePlayers,
+      },
+      this.room!.roomVersion
+    );
+    this.broadcastByRole('screen', publicProgress);
+    this.broadcastByRole('player', publicProgress);
+
     // Check if all eligible active players have answered
     this.checkAllAnswered();
   }
@@ -672,8 +736,13 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    // Check room version for staleness
-    if (parsed.data.expectedRoomVersion < this.room.roomVersion) {
+    // Check room version for staleness (P0.6, P0.7)
+    if (parsed.data.expectedRoomVersion > this.room.roomVersion) {
+      this.sendError(ws, ProtocolError.INVALID_PAYLOAD, 'Future room version not allowed', correlationId);
+      return;
+    }
+    const lastStateVersion = this.room.lastStateVersion ?? 0;
+    if (parsed.data.expectedRoomVersion < lastStateVersion) {
       this.sendError(ws, ProtocolError.STALE_VERSION, 'Stale version', correlationId);
       return;
     }
@@ -782,6 +851,8 @@ export class GameRoom extends DurableObject {
     }
     
     this.incrementVersion();
+    this.sql.exec('UPDATE room SET last_state_version = ? WHERE pin = ?', this.room!.roomVersion, this.room!.pin);
+    this.room!.lastStateVersion = this.room!.roomVersion;
     this.loadRoom();
     
     // Set deadline alarm
@@ -881,6 +952,9 @@ export class GameRoom extends DurableObject {
         this.room!.roomVersion
       )));
     }
+
+    // P0.15: Schedule automatic reveal transition to ranking (5 seconds)
+    this.ctx.storage.setAlarm(Date.now() + REVEAL_DURATION_MS);
   }
 
   private handleShowRanking(correlationId?: string): void {
@@ -899,6 +973,13 @@ export class GameRoom extends DurableObject {
       { rankings: ranking, isFinal: isLastQuestion },
       this.room!.roomVersion
     ));
+
+    // P0.17 & P0.19: Schedule next automatic step
+    if (isLastQuestion) {
+      this.ctx.storage.setAlarm(Date.now() + FINAL_RANKING_DURATION_MS);
+    } else {
+      this.ctx.storage.setAlarm(Date.now() + ROUND_RANKING_DURATION_MS);
+    }
   }
 
   private handleNextQuestion(correlationId?: string): void {
@@ -922,6 +1003,9 @@ export class GameRoom extends DurableObject {
       { podium, fullRanking: ranking, isFinal: true },
       this.room!.roomVersion
     ));
+
+    // P0.21 & P0.22: Schedule automatic transition to FINISHED after ceremony
+    this.ctx.storage.setAlarm(Date.now() + PODIUM_DURATION_MS);
   }
 
   private handleEndGame(correlationId?: string): void {
@@ -943,20 +1027,31 @@ export class GameRoom extends DurableObject {
   }
 
   private handlePause(correlationId?: string): void {
-    if (!this.room || this.room.status !== GameState.QUESTION_ACTIVE) return;
+    if (!this.room) return;
+    const currentStatus = this.room.status;
+    if (
+      currentStatus !== GameState.QUESTION_ACTIVE &&
+      currentStatus !== GameState.COUNTDOWN &&
+      currentStatus !== GameState.QUESTION_REVEAL &&
+      currentStatus !== GameState.ROUND_RANKING
+    ) {
+      return;
+    }
     
-    const round = this.getCurrentRound();
-    if (!round) return;
-    
-    const now = Date.now();
-    const remainingMs = Math.max(0, round.deadlineAt - now);
-    const activeInThisSegment = Math.max(0, now - round.startedAt);
-    const accumulatedActiveMs = round.accumulatedActiveMs + activeInThisSegment;
-    
-    this.sql.exec(
-      `UPDATE rounds SET state = 'paused', remaining_ms = ?, accumulated_active_ms = ? WHERE question_id = ?`,
-      remainingMs, accumulatedActiveMs, round.questionId
-    );
+    if (currentStatus === GameState.QUESTION_ACTIVE) {
+      const round = this.getCurrentRound();
+      if (round) {
+        const now = Date.now();
+        const remainingMs = Math.max(0, round.deadlineAt - now);
+        const activeInThisSegment = Math.max(0, now - round.startedAt);
+        const accumulatedActiveMs = round.accumulatedActiveMs + activeInThisSegment;
+        
+        this.sql.exec(
+          `UPDATE rounds SET state = 'paused', remaining_ms = ?, accumulated_active_ms = ? WHERE question_id = ?`,
+          remainingMs, accumulatedActiveMs, round.questionId
+        );
+      }
+    }
     
     this.ctx.storage.deleteAlarm();
     this.transitionTo(GameState.PAUSED, correlationId);
@@ -1018,6 +1113,7 @@ export class GameRoom extends DurableObject {
       pin: r.pin as string,
       status: r.status as GameState,
       roomVersion: r.room_version as number,
+      lastStateVersion: (r.last_state_version as number) ?? 0,
       entryLocked: Boolean(r.entry_locked),
       currentQuestionIndex: r.current_question_index as number,
       createdAt: r.created_at as number,
@@ -1096,21 +1192,27 @@ export class GameRoom extends DurableObject {
 
   private getEffectivePresences(now = Date.now()): PresenceData[] {
     const playerSockets = this.getWebSocketsByRole('player');
+    const players = this.getActivePlayers();
 
     return this.getPresences().map(presence => {
-      if (!presence.connected) return presence;
-
+      const player = players.find(p => p.playerId === presence.playerId);
       const ws = playerSockets.find(socket => this.getConnectionMeta(socket).playerId === presence.playerId);
-      if (!ws) return { ...presence, connected: false };
 
-      const metaLastSeenAt = this.getConnectionMeta(ws).lastSeenAt ?? 0;
-      const autoResponseLastSeenAt = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
-      const lastSeenAt = Math.max(presence.lastSeenAt, metaLastSeenAt, autoResponseLastSeenAt);
+      let lastSeenAt = presence.lastSeenAt;
+      if (ws) {
+        const metaLastSeenAt = this.getConnectionMeta(ws).lastSeenAt ?? 0;
+        const autoResponseLastSeenAt = this.ctx.getWebSocketAutoResponseTimestamp(ws)?.getTime() ?? 0;
+        lastSeenAt = Math.max(presence.lastSeenAt, metaLastSeenAt, autoResponseLastSeenAt);
+      }
+
+      const connected = Boolean(ws && isPlayerActive({ ...presence, lastSeenAt }, now));
+      const status = getPlayerPresenceStatus(player || { removedAt: null }, { connected, lastSeenAt }, now);
 
       return {
         ...presence,
         lastSeenAt,
-        connected: isPlayerActive({ ...presence, lastSeenAt }, now),
+        connected,
+        status,
       };
     });
   }
@@ -1136,6 +1238,8 @@ export class GameRoom extends DurableObject {
     assertTransition(this.room.status, newState);
     this.sql.exec('UPDATE room SET status = ?', newState);
     this.incrementVersion();
+    this.sql.exec('UPDATE room SET last_state_version = ? WHERE pin = ?', this.room.roomVersion, this.room.pin);
+    this.room.lastStateVersion = this.room.roomVersion;
     this.broadcastStateChange(correlationId);
   }
 
@@ -1231,55 +1335,116 @@ export class GameRoom extends DurableObject {
 
   private broadcastPresenceChange(playerId: string, connected: boolean, reason?: string): void {
     if (!this.room) return;
+    const now = Date.now();
+    const presences = this.getEffectivePresences(now);
+    const pr = presences.find(p => p.playerId === playerId);
+    const status = pr?.status ?? (connected ? 'CONNECTED' : 'TEMPORARILY_DISCONNECTED');
+
     this.broadcastToAll(createServerEnvelope(
       ServerEventType.PLAYER_PRESENCE_CHANGED,
-      { playerId, connected, reason },
+      { playerId, connected, status, reason },
       this.room.roomVersion
     ));
   }
 
   private sendSnapshot(ws: WebSocket, role: string, playerId?: string, correlationId?: string): void {
     if (!this.room) return;
-    
-    const players = this.getActivePlayers().map(p => ({
+    const now = Date.now();
+    const activePlayers = this.getActivePlayers();
+    const presences = this.getEffectivePresences(now);
+    const scores = this.getScores();
+    const round = this.getCurrentRound();
+    const rankings = this.computeRanking();
+    const podium = rankings.slice(0, 3);
+    const isLastQuestion = this.room.currentQuestionIndex >= TOTAL_QUESTIONS - 1;
+    const counts = getRoomPlayerCounts(activePlayers, presences, this.room.currentQuestionIndex, now);
+
+    const players = activePlayers.map(p => ({
       playerId: p.playerId,
       nickname: p.nickname,
       joinedAt: p.joinedAt,
       eligibleFromQuestion: p.eligibleFromQuestion,
     }));
-    
-    const presences = this.getEffectivePresences().map(p => ({
-      playerId: p.playerId,
-      connected: p.connected,
-    }));
-    
-    const scores = this.getScores();
-    const round = this.getCurrentRound();
-    
+
     let currentQuestion: unknown = null;
-    if (this.room.currentQuestionIndex >= 0) {
+    let distribution: unknown[] = [];
+    let correctOptionId: string | null = null;
+    let explanation: string | null = null;
+
+    if (this.room.currentQuestionIndex >= 0 && this.room.currentQuestionIndex < TOTAL_QUESTIONS) {
       const q = questions[this.room.currentQuestionIndex];
+      const answers = this.getAnswersForQuestion(q.id);
+      
+      const computedDistribution = q.options.map(opt => {
+        const count = answers.filter(a => a.optionId === opt.id).length;
+        return {
+          optionId: opt.id,
+          count,
+          percentage: answers.length > 0 ? Math.round((count / answers.length) * 100) : 0,
+        };
+      });
+
       if (this.room.status === GameState.QUESTION_ACTIVE || this.room.status === GameState.PAUSED) {
         currentQuestion = toPublicQuestion(q);
-      } else if (this.room.status === GameState.QUESTION_REVEAL) {
-        currentQuestion = q; // Include answer for reveal
+        if (role === 'host') {
+          distribution = computedDistribution;
+        }
+      } else {
+        currentQuestion = q;
+        distribution = computedDistribution;
+        correctOptionId = q.correctOptionId;
+        explanation = q.explanation ?? null;
       }
     }
-    
-    // Personal answers for the player
+
     let personalAnswers: unknown[] = [];
-    if (playerId && role === 'player') {
+    let personalResult: unknown = null;
+    let personalScore: unknown = null;
+
+    if (playerId) {
       personalAnswers = this.sql.exec(
-        'SELECT question_id, option_id, correct, awarded_points FROM answers WHERE player_id = ?',
+        'SELECT question_id, option_id, received_at, response_time_ms, correct, awarded_points FROM answers WHERE player_id = ?',
         playerId
       ).toArray().map((a: any) => ({
         questionId: a.question_id as string,
         optionId: a.option_id as string,
+        receivedAt: a.received_at as number,
+        responseTimeMs: a.response_time_ms as number,
         correct: Boolean(a.correct),
         awardedPoints: a.awarded_points as number,
       }));
+
+      const myScore = scores.find(s => s.playerId === playerId);
+      const myRank = rankings.find(r => r.playerId === playerId);
+      personalScore = {
+        totalPoints: myScore?.totalPoints ?? 0,
+        correctCount: myScore?.correctCount ?? 0,
+        position: myRank?.position ?? 0,
+      };
+
+      if (this.room.currentQuestionIndex >= 0 && this.room.currentQuestionIndex < TOTAL_QUESTIONS) {
+        const q = questions[this.room.currentQuestionIndex];
+        const activeAnswer = (personalAnswers as any[]).find(a => a.questionId === q.id);
+        if (activeAnswer) {
+          if (this.room.status !== GameState.QUESTION_ACTIVE && this.room.status !== GameState.PAUSED) {
+            personalResult = {
+              correct: activeAnswer.correct,
+              selectedOptionId: activeAnswer.optionId,
+              awardedPoints: activeAnswer.awardedPoints,
+              responseTimeMs: activeAnswer.responseTimeMs,
+            };
+          }
+        } else if (this.room.status === GameState.QUESTION_REVEAL || this.room.status === GameState.ROUND_RANKING) {
+          personalResult = {
+            correct: false,
+            selectedOptionId: '',
+            awardedPoints: 0,
+            responseTimeMs: 0,
+          };
+        }
+      }
     }
-    
+
     const snapshot = createServerEnvelope(
       ServerEventType.SNAPSHOT,
       {
@@ -1287,6 +1452,7 @@ export class GameRoom extends DurableObject {
           pin: this.room.pin,
           status: this.room.status,
           roomVersion: this.room.roomVersion,
+          lastStateVersion: this.room.lastStateVersion ?? 0,
           entryLocked: this.room.entryLocked,
           currentQuestionIndex: this.room.currentQuestionIndex,
         },
@@ -1295,13 +1461,22 @@ export class GameRoom extends DurableObject {
         scores,
         round,
         currentQuestion,
+        distribution,
+        correctOptionId,
+        explanation,
+        rankings,
+        podium,
+        isFinalRanking: isLastQuestion,
         personalAnswers,
+        personalResult,
+        personalScore,
+        counts,
         playerId,
       },
       this.room.roomVersion,
       correlationId
     );
-    
+
     ws.send(JSON.stringify(snapshot));
   }
 

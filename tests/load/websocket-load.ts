@@ -102,7 +102,10 @@ export async function runWebSocketLoadTest(
     if (!roomRes.ok) {
       throw new Error(`Failed to create room: ${roomRes.statusText}`);
     }
-    const { pin, hostToken } = (await roomRes.json()) as { pin: string; hostToken: string };
+    const { pin } = (await roomRes.json()) as { pin: string };
+    const setCookie = roomRes.headers.get('set-cookie') || '';
+    const hostTokenMatch = setCookie.match(/batalha_host_[^=]+=([^;]+)/);
+    const hostToken = hostTokenMatch ? hostTokenMatch[1] : '';
     console.log(`[Load Test] Room created successfully. PIN: ${pin}`);
 
     const wsOrigin = config.baseUrl.replace(/^http/, 'ws');
@@ -110,8 +113,12 @@ export async function runWebSocketLoadTest(
 
     // 2. Connect 1 Host WebSocket
     console.log(`[Load Test] Connecting Host WebSocket...`);
-    const hostWsUrl = `${wsOrigin}/api/rooms/${pin}/ws?role=host&token=${hostToken}`;
-    const hostWs = new WebSocket(hostWsUrl);
+    const hostWsUrl = `${wsOrigin}/api/rooms/${pin}/ws?role=host`;
+    const hostWs = new (WebSocket as any)(hostWsUrl, {
+      headers: {
+        Cookie: `batalha_host_${pin}=${hostToken}`,
+      },
+    });
     allSockets.push(hostWs);
 
     let hostRoomVersion = 0;
@@ -252,7 +259,7 @@ export async function runWebSocketLoadTest(
       JSON.stringify(
         createClientEnvelope(
           ClientEventType.HOST_COMMAND,
-          { command: 'START_GAME', expectedRoomVersion: 99999 },
+          { command: 'START_GAME', expectedRoomVersion: hostRoomVersion },
           hostRoomVersion
         )
       )
@@ -320,8 +327,75 @@ export async function runWebSocketLoadTest(
 
     await Promise.all(answerSubmissionPromises);
 
-    // Wait for question reveal event indicating server processed all answers
-    await Promise.race([questionRevealPromise, delay(5000)]);
+    // 7. Validate Section 11 requirements:
+    // A. Rodada encerra & Estado final coerente
+    console.log(`[Load Test] Waiting for round to automatically end and transition to reveal...`);
+    const revealPayload = await Promise.race([
+      questionRevealPromise,
+      delay(8000).then(() => { throw new Error('Timeout waiting for automatic round close'); }),
+    ]);
+    const roundClosed = Boolean(revealPayload && (revealPayload.correctOptionId || revealPayload.questionId));
+    console.log(`[Load Test] Round ended automatically: ${roundClosed ? 'PASSED' : 'FAILED'}`);
+
+    // B. Respostas únicas & Nenhuma perda & Nenhuma duplicação
+    const acceptedCount = playerSessions.filter(s => s.answerAccepted).length;
+    const droppedCount = config.playerCount - acceptedCount;
+    const uniquePlayerIds = new Set(playerSessions.map(s => s.playerId));
+    const uniqueAcceptedIds = new Set(playerSessions.filter(s => s.answerAccepted).map(s => s.playerId));
+    const uniqueAnswersValid = uniquePlayerIds.size === config.playerCount && uniqueAcceptedIds.size === config.playerCount;
+    const noLossValid = acceptedCount === config.playerCount && droppedCount === 0;
+
+    // C. Conexões recuperáveis: disconnect 1 player and reconnect via RESUME_SESSION
+    console.log(`[Load Test] Testing connection recovery for Player 1 via RESUME_SESSION...`);
+    const testPlayer = playerSessions[0];
+    testPlayer.ws.close(1000, 'Test disconnection');
+    await delay(200);
+
+    const reconWs = new WebSocket(`${wsOrigin}/api/rooms/${pin}/ws?role=player`);
+    allSockets.push(reconWs);
+    let recoverySuccessful = false;
+
+    await new Promise<void>((resolve, reject) => {
+      const reconTimeout = setTimeout(() => reject(new Error('Player recovery timeout')), 10000);
+
+      reconWs.onopen = () => {
+        reconWs.send(
+          JSON.stringify(
+            createClientEnvelope(
+              ClientEventType.RESUME_SESSION,
+              { pin, reconnectToken: testPlayer.reconnectToken },
+              0
+            )
+          )
+        );
+      };
+
+      reconWs.onmessage = (event) => {
+        try {
+          const env = JSON.parse(event.data as string) as EventEnvelope<string, any>;
+          if (env.type === ServerEventType.SESSION_ACCEPTED) {
+            if (env.payload.playerId === testPlayer.playerId) {
+              recoverySuccessful = true;
+            }
+          } else if (env.type === ServerEventType.SNAPSHOT) {
+            clearTimeout(reconTimeout);
+            resolve();
+          }
+        } catch {
+          // ignore
+        }
+      };
+
+      reconWs.onerror = (err) => {
+        clearTimeout(reconTimeout);
+        reject(err);
+      };
+    });
+    console.log(`[Load Test] Connection recovery: ${recoverySuccessful ? 'PASSED' : 'FAILED'}`);
+
+    // D. RoomVersion coerente
+    const versionCoherent = hostRoomVersion >= config.playerCount;
+    console.log(`[Load Test] Room version consistency: v${hostRoomVersion} (Coherent: ${versionCoherent ? 'PASSED' : 'FAILED'})`);
 
     const totalDurationMs = Date.now() - startTime;
     latenciesMs.sort((a, b) => a - b);
@@ -333,9 +407,8 @@ export async function runWebSocketLoadTest(
     const p99LatencyMs = latenciesMs.length > 0 ? latenciesMs[Math.floor(latenciesMs.length * 0.99)] : 0;
     const maxLatencyMs = latenciesMs.length > 0 ? latenciesMs[latenciesMs.length - 1] : 0;
 
-    const acceptedCount = playerSessions.filter(s => s.answerAccepted).length;
-    const droppedCount = config.playerCount - acceptedCount;
-    const success = acceptedCount === config.playerCount && p95LatencyMs <= config.maxP95LatencyMs;
+    const latencySlaPassed = p95LatencyMs <= config.maxP95LatencyMs;
+    const success = noLossValid && uniqueAnswersValid && roundClosed && recoverySuccessful && versionCoherent && latencySlaPassed;
 
     console.log(`\n======================================================`);
     console.log(`            WEBSOCKET LOAD TEST RESULTS               `);
@@ -343,13 +416,19 @@ export async function runWebSocketLoadTest(
     console.log(`PIN: ${pin}`);
     console.log(`Host Connected: 1/1 | Screens Connected: ${config.screenCount}/${config.screenCount}`);
     console.log(`Players Connected: ${playerSessions.length}/${config.playerCount}`);
+    console.log(`Respostas Únicas: ${uniqueAnswersValid ? 'PASSED (50/50)' : 'FAILED'}`);
+    console.log(`Nenhuma Perda: ${noLossValid ? 'PASSED (0 perdidas)' : 'FAILED'}`);
+    console.log(`Nenhuma Duplicação: ${uniqueAnswersValid ? 'PASSED (0 duplicatas)' : 'FAILED'}`);
+    console.log(`Rodada Encerra Automaticamente: ${roundClosed ? 'PASSED' : 'FAILED'}`);
+    console.log(`RoomVersion Coerente: ${versionCoherent ? `PASSED (v${hostRoomVersion})` : 'FAILED'}`);
+    console.log(`Conexões Recuperáveis: ${recoverySuccessful ? 'PASSED (RESUME_SESSION ok)' : 'FAILED'}`);
     console.log(`Answers Accepted: ${acceptedCount}/${config.playerCount} (${((acceptedCount / config.playerCount) * 100).toFixed(1)}%)`);
     console.log(`Dropped Answers: ${droppedCount} (0% target: ${droppedCount === 0 ? 'PASSED' : 'FAILED'})`);
     console.log(`Latency SLA:`);
     console.log(`  Min:  ${minLatencyMs}ms`);
     console.log(`  p50:  ${p50LatencyMs}ms`);
     console.log(`  p90:  ${p90LatencyMs}ms`);
-    console.log(`  p95:  ${p95LatencyMs}ms (Limit: ${config.maxP95LatencyMs}ms — ${p95LatencyMs <= config.maxP95LatencyMs ? 'PASSED' : 'FAILED'})`);
+    console.log(`  p95:  ${p95LatencyMs}ms (Limit: ${config.maxP95LatencyMs}ms — ${latencySlaPassed ? 'PASSED' : 'FAILED'})`);
     console.log(`  p99:  ${p99LatencyMs}ms`);
     console.log(`  Max:  ${maxLatencyMs}ms`);
     console.log(`Total Duration: ${totalDurationMs}ms`);

@@ -1,6 +1,6 @@
 const API_BASE = '/api';
 
-export async function createRoom(): Promise<{ pin: string; joinUrl: string; hostToken: string }> {
+export async function createRoom(): Promise<{ pin: string; joinUrl: string }> {
   const response = await fetch(`${API_BASE}/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

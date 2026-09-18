@@ -10,6 +10,7 @@ import PlayerRanking from '../components/player/PlayerRanking.js';
 import PlayerPodium from '../components/player/PlayerPodium.js';
 import PlayerFinished from '../components/player/PlayerFinished.js';
 import ReconnectOverlay from '../components/player/ReconnectOverlay.js';
+import { wsManager } from '../lib/ws.js';
 
 export function PlayerPage() {
   const { pin } = useParams<{ pin: string }>();
@@ -39,7 +40,7 @@ export function PlayerPage() {
       return;
     }
 
-    if (connectionState === 'disconnected') {
+    if (connectionState === 'disconnected' && wsManager.state === 'disconnected') {
       const savedToken = localStorage.getItem(`batalha_session_${pin}`);
       if (savedToken) {
         connect(pin, 'player', savedToken);
@@ -49,7 +50,8 @@ export function PlayerPage() {
     }
   }, [pin, connectionState, playerId, connect, navigate]);
 
-  if (connectionState === 'disconnected' || connectionState === 'connecting') {
+  const isConnected = connectionState === 'connected' || wsManager.state === 'connected';
+  if (!isConnected && (connectionState === 'disconnected' || connectionState === 'connecting')) {
     return (
       <div className="min-h-screen bg-[#1e3a5f] text-white flex items-center justify-center p-4 text-center">
         <div className="flex flex-col items-center space-y-4">

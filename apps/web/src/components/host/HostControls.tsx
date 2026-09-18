@@ -111,43 +111,67 @@ export default function HostControls({ roomState }: HostControlsProps) {
         );
       case 'QUESTION_REVEAL':
         return (
-          <button 
-            type="button"
-            onClick={() => handleCommand('SHOW_RANKING')}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
-          >
-            📊 Ver Classificação
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Avanço automático em ~5s
+            </span>
+            <button 
+              type="button"
+              onClick={() => handleCommand('SHOW_RANKING')}
+              className="px-5 py-2 bg-blue-600/80 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
+            >
+              📊 Ver Classificação
+            </button>
+          </div>
         );
       case 'ROUND_RANKING':
         return (
-          <button 
-            type="button"
-            onClick={() => handleCommand('NEXT_QUESTION')}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
-          >
-            ➡ Próxima Pergunta
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Próxima questão em ~5s
+            </span>
+            <button 
+              type="button"
+              onClick={() => handleCommand('NEXT_QUESTION')}
+              className="px-5 py-2 bg-blue-600/80 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
+            >
+              ➡ Próxima Pergunta
+            </button>
+          </div>
         );
       case 'FINAL_RANKING':
         return (
-          <button 
-            type="button"
-            onClick={() => handleCommand('START_PODIUM')}
-            className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-xl shadow-lg transition-all cursor-pointer"
-          >
-            🏆 Iniciar Pódio
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-yellow-200 font-medium flex items-center gap-1.5 bg-yellow-950/40 px-3 py-1.5 rounded-lg border border-yellow-400/20">
+              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+              Pódio iniciando em ~5s
+            </span>
+            <button 
+              type="button"
+              onClick={() => handleCommand('START_PODIUM')}
+              className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-xl text-sm shadow-lg transition-all cursor-pointer"
+            >
+              🏆 Iniciar Pódio
+            </button>
+          </div>
         );
       case 'PODIUM':
         return (
-          <button 
-            type="button"
-            onClick={() => setConfirmAction('END_GAME')}
-            className="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
-          >
-            🏁 Concluir Partida
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Encerramento automático em ~10s
+            </span>
+            <button 
+              type="button"
+              onClick={() => setConfirmAction('END_GAME')}
+              className="px-5 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
+            >
+              🏁 Concluir Partida
+            </button>
+          </div>
         );
       default:
         return null;

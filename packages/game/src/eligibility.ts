@@ -95,3 +95,44 @@ export function canStartGame(players: Array<{ removedAt?: number | null }>): boo
   return players.some(p => p.removedAt === null || p.removedAt === undefined);
 }
 
+/**
+ * PRD v1.1 / P1.1: Determine player presence status
+ */
+export function getPlayerPresenceStatus(
+  player: { removedAt?: number | null },
+  presence: { connected: boolean; lastSeenAt: number } | undefined,
+  now: number
+): 'CONNECTED' | 'TEMPORARILY_DISCONNECTED' | 'REMOVED' {
+  if (player.removedAt !== null && player.removedAt !== undefined) {
+    return 'REMOVED';
+  }
+  if (presence && isPlayerActive(presence as PresenceData, now)) {
+    return 'CONNECTED';
+  }
+  return 'TEMPORARILY_DISCONNECTED';
+}
+
+/**
+ * PRD v1.1 / P0.9: Single authoritative source of truth for room player counters
+ */
+export function getRoomPlayerCounts(
+  players: PlayerData[],
+  presences: PresenceData[],
+  questionIndex: number,
+  now: number
+): {
+  totalPlayers: number;
+  connectedPlayers: number;
+  eligiblePlayers: number;
+} {
+  const nonRemoved = players.filter(p => p.removedAt === null);
+  const totalPlayers = nonRemoved.length;
+  const connectedPlayers = nonRemoved.filter(p => {
+    const pr = presences.find(pres => pres.playerId === p.playerId);
+    return pr ? isPlayerActive(pr, now) : false;
+  }).length;
+  const eligiblePlayers = nonRemoved.filter(p => isPlayerEligible(p, questionIndex)).length;
+
+  return { totalPlayers, connectedPlayers, eligiblePlayers };
+}
+

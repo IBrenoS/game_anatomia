@@ -2,6 +2,7 @@ import {
   createClientEnvelope,
   EventEnvelopeSchema,
   ClientEventType,
+  ServerEventType,
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_PING_FRAME,
   HEARTBEAT_PONG_FRAME,
@@ -24,6 +25,26 @@ export class WebSocketManager {
   private currentRole: string | null = null;
   private currentToken: string | undefined;
 
+  constructor() {
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      // P0.1: Mobile foreground / visibility change
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.handleForegroundSync();
+        }
+      });
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      // P0.1: pageshow / focus
+      window.addEventListener('pageshow', () => this.handleForegroundSync());
+      window.addEventListener('focus', () => this.handleForegroundSync());
+
+      // P0.2: Network online / offline
+      window.addEventListener('online', () => this.handleNetworkOnline());
+      window.addEventListener('offline', () => this.handleNetworkOffline());
+    }
+  }
+
   get state(): ConnectionState { return this._state; }
   get roomVersion(): number { return this._roomVersion; }
 
@@ -35,21 +56,34 @@ export class WebSocketManager {
   }
 
   connect(pin: string, role: string, token?: string): void {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
-      return;
+    if (this.ws) {
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        return;
+      }
+      try {
+        this.ws.onopen = null;
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.onmessage = null;
+        this.ws.close();
+      } catch {
+        // ignore
+      }
+      this.ws = null;
     }
 
     this.currentPin = pin;
     this.currentRole = role;
-    this.currentToken = token;
+    this.currentToken = token ?? this.currentToken ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${pin}`) || undefined : undefined);
 
     this.setState(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
 
     const url = new URL(`/api/rooms/${pin}/ws`, window.location.origin);
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
     url.searchParams.set('role', role);
-    if (token) {
-      url.searchParams.set('token', token);
+    // P1.15: Never pass hostToken in WebSocket URL query param (HttpOnly cookie used)
+    if (this.currentToken && role !== 'host') {
+      url.searchParams.set('token', this.currentToken);
     }
 
     this.ws = new WebSocket(url.toString());
@@ -60,9 +94,13 @@ export class WebSocketManager {
       this.startHeartbeat();
 
       if (this.currentPin) {
-        if (this.currentRole === 'player' && this.currentToken) {
-          // P0.2: Automatically resume session when connecting with saved player token
-          this.resumeSession(this.currentPin, this.currentToken);
+        if (this.currentRole === 'player') {
+          const token = this.currentToken ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${this.currentPin}`) || undefined : undefined);
+          if (token) {
+            this.currentToken = token;
+            // P0.2: Automatically resume session when connecting with saved player token
+            this.resumeSession(this.currentPin, token);
+          }
         } else if (this.currentRole === 'host' || this.currentRole === 'screen') {
           // P0.1: Immediate snapshot request for host/screen
           this.requestSnapshot();
@@ -98,6 +136,17 @@ export class WebSocketManager {
         // Skip internal keep-alive responses
         if (envelope.type === 'PONG') return;
 
+        // P0.3: Update reconnectToken when SESSION_ACCEPTED arrives
+        if (envelope.type === ServerEventType.SESSION_ACCEPTED) {
+          const payload = envelope.payload as any;
+          if (payload?.reconnectToken) {
+            this.currentToken = payload.reconnectToken;
+            if (this.currentPin && typeof localStorage !== 'undefined') {
+              localStorage.setItem(`batalha_session_${this.currentPin}`, payload.reconnectToken);
+            }
+          }
+        }
+
         // P0.3: Deduplicate eventId
         if (envelope.eventId) {
           if (this.seenEventIds.has(envelope.eventId)) {
@@ -110,10 +159,14 @@ export class WebSocketManager {
           }
         }
         
-        // P0.3: Protocol ordering, stale event discarding, and gap detection
+        // P0.3 & P0.5: Protocol ordering, stale event discarding, and gap detection
         if ('roomVersion' in envelope && typeof envelope.roomVersion === 'number') {
           const incomingVersion = envelope.roomVersion;
           if (envelope.type === 'SNAPSHOT') {
+            if (this._roomVersion > 0 && incomingVersion < this._roomVersion) {
+              console.warn(`[ws] Discarding stale SNAPSHOT (current v${this._roomVersion}, incoming v${incomingVersion})`);
+              return;
+            }
             this._roomVersion = incomingVersion;
           } else if (this._roomVersion > 0) {
             if (incomingVersion < this._roomVersion) {
@@ -122,10 +175,10 @@ export class WebSocketManager {
               return;
             }
             if (incomingVersion > this._roomVersion + 1) {
-              // Version gap detected: request snapshot to resynchronize
+              // P0.5: Version gap detected: request snapshot and discard incremental event
               console.warn(`[ws] Version gap detected (current v${this._roomVersion}, incoming v${incomingVersion}). Requesting SNAPSHOT.`);
-              this._roomVersion = incomingVersion;
               this.requestSnapshot();
+              return;
             } else {
               this._roomVersion = incomingVersion;
             }
@@ -142,6 +195,43 @@ export class WebSocketManager {
         console.error('Failed to parse WebSocket message:', error);
       }
     };
+  }
+
+  handleForegroundSync(): void {
+    if (!this.currentPin && typeof window !== 'undefined') {
+      const match = window.location.pathname.match(/\/(?:play|join|host|screen)\/([A-Za-z0-9]+)/);
+      if (match) {
+        this.currentPin = match[1];
+      }
+    }
+    if (!this.currentRole && typeof window !== 'undefined') {
+      if (window.location.pathname.startsWith('/host')) this.currentRole = 'host';
+      else if (window.location.pathname.startsWith('/screen')) this.currentRole = 'screen';
+      else if (window.location.pathname.startsWith('/play') || window.location.pathname.startsWith('/join')) this.currentRole = 'player';
+    }
+    if (!this.currentPin || !this.currentRole) return;
+
+    if (!this.currentToken && typeof localStorage !== 'undefined' && this.currentRole === 'player') {
+      this.currentToken = localStorage.getItem(`batalha_session_${this.currentPin}`) || undefined;
+    }
+
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.connect(this.currentPin, this.currentRole, this.currentToken);
+    } else {
+      this.requestSnapshot();
+    }
+  }
+
+  handleNetworkOnline(): void {
+    this.handleForegroundSync();
+  }
+
+  handleNetworkOffline(): void {
+    this.setState('reconnecting');
   }
 
   disconnect(): void {
@@ -243,7 +333,22 @@ export class WebSocketManager {
       this.stateHandlers.delete(handler);
     };
   }
+
+  // Testing & lifecycle simulation helper
+  closeSocketForTest(): void {
+    if (this.ws) {
+      try {
+        this.ws.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
 }
 
 // Singleton
 export const wsManager = new WebSocketManager();
+
+if (typeof window !== 'undefined') {
+  (window as any).__wsManager = wsManager;
+}

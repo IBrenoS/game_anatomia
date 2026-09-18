@@ -31,6 +31,10 @@ export function JoinPage() {
         if (!room) {
           setError('Sala não encontrada.');
           setIsValidRoom(false);
+        } else if (room.status === 'FINISHED') {
+          setError('Esta partida já foi encerrada.');
+          setIsValidRoom(false);
+          localStorage.removeItem(`batalha_session_${pin}`);
         } else {
           setIsValidRoom(true);
           // Auto-reconnect if we have a saved session
@@ -58,7 +62,7 @@ export function JoinPage() {
 
   // Navigate to play page when session is established
   useEffect(() => {
-    if (playerId && connectionState === 'connected') {
+    if (playerId && (connectionState === 'connected' || wsManager.state === 'connected')) {
       navigate(`/play/${pin}`, { replace: true });
     }
   }, [playerId, connectionState, navigate, pin]);

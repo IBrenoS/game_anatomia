@@ -40,7 +40,6 @@ interface GameStoreState {
   reconnectToken: string | null;
   
   // Host data
-  hostToken: string | null;
   joinUrl: string | null;
   
   // Players
@@ -77,6 +76,10 @@ interface GameStoreState {
   // Countdown tracking
   countdownStartedAt: number | null;
 
+  // Round progress
+  answeredCount: number;
+  totalEligible: number;
+
   // Answer rejected state
   answerRejected: { code: string; message: string } | null;
   
@@ -84,7 +87,7 @@ interface GameStoreState {
   setConnectionState: (state: GameStoreState['connectionState']) => void;
   setPin: (pin: string) => void;
   setRole: (role: GameStoreState['role']) => void;
-  setHostData: (data: { hostToken: string; joinUrl: string; pin: string }) => void;
+  setHostData: (data: { joinUrl: string; pin: string }) => void;
   setSession: (data: { playerId: string; reconnectToken?: string; nickname: string }) => void;
   
   // Event handlers - called by WebSocket manager
@@ -93,6 +96,7 @@ interface GameStoreState {
   handlePlayerPresenceChanged: (payload: any) => void;
   handleGameStateChanged: (payload: any) => void;
   handleQuestionStarted: (payload: any) => void;
+  handleRoundProgress: (payload: any) => void;
   handleAnswerAccepted: (payload: any) => void;
   handleAnswerRejected: (payload: { code: string; message: string }) => void;
   handleQuestionEnded: (payload: any) => void;
@@ -117,7 +121,6 @@ const initialState = {
   playerId: null,
   nickname: null,
   reconnectToken: null,
-  hostToken: null,
   joinUrl: null,
   players: [],
   presences: [],
@@ -129,6 +132,8 @@ const initialState = {
   answerAcceptedAt: null,
   answerRejected: null,
   countdownStartedAt: null,
+  answeredCount: 0,
+  totalEligible: 0,
   correctOptionId: null,
   explanation: null,
   distribution: [],
@@ -151,13 +156,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   setPin: (pin) => set({ pin }),
   setRole: (role) => set({ role }),
   setHostData: (data) => set({ 
-    hostToken: data.hostToken, 
     joinUrl: data.joinUrl, 
     pin: data.pin 
   }),
   setSession: (data) => {
     const pin = get().pin || (typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : null);
-    if (pin && data.reconnectToken) {
+    if (pin && data.reconnectToken && typeof localStorage !== 'undefined') {
       localStorage.setItem(`batalha_session_${pin}`, data.reconnectToken);
     }
     set({
@@ -168,67 +172,146 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   handleSnapshot: (payload) => set((state) => {
-    const activeQId = payload.currentQuestion?.id;
-    let selectedOptionId = state.selectedOptionId;
-    let answerSubmitted = state.answerSubmitted;
-    let answerAcceptedAt = state.answerAcceptedAt;
-    let personalResult = state.personalResult;
+    const status = payload.room?.status ?? state.roomState;
+    const incomingVersion = payload.room?.roomVersion ?? state.roomVersion;
+    if (incomingVersion > 0 && incomingVersion < state.roomVersion) {
+      // Discard stale snapshot that is strictly older than current store version
+      return state;
+    }
 
+    const activeQId = payload.currentQuestion?.id;
+    const isSameQuestion = Boolean(activeQId && state.currentQuestion?.id === activeQId);
+
+    let selectedOptionId: string | null = null;
+    let answerSubmitted = false;
+    let answerAcceptedAt: number | null = null;
+    let personalResult: PersonalResult | null = null;
+
+    // Check if player has an answer in personalAnswers for the active question
+    let answerForActive: any = null;
     if (activeQId && Array.isArray(payload.personalAnswers)) {
-      const answerForActive = payload.personalAnswers.find(
+      answerForActive = payload.personalAnswers.find(
         (a: any) => a.questionId === activeQId || a.question_id === activeQId
       );
+    }
+
+    if (status === 'QUESTION_ACTIVE' || status === 'PAUSED') {
       if (answerForActive) {
         selectedOptionId = answerForActive.optionId || answerForActive.option_id;
         answerSubmitted = true;
         answerAcceptedAt = answerForActive.receivedAt || answerForActive.received_at || state.answerAcceptedAt;
-        
-        if (payload.room?.status === 'QUESTION_REVEAL') {
-          personalResult = {
-            correct: Boolean(answerForActive.correct),
-            selectedOptionId: selectedOptionId || '',
-            awardedPoints: answerForActive.awardedPoints || answerForActive.awarded_points || 0,
-            responseTimeMs: answerForActive.responseTimeMs || answerForActive.response_time_ms || 0,
+      } else if (isSameQuestion && !state.answerSubmitted) {
+        // Retain unsubmitted local selection on same question
+        selectedOptionId = state.selectedOptionId;
+        answerSubmitted = false;
+      }
+      personalResult = null;
+    } else if (status === 'QUESTION_REVEAL') {
+      if (payload.personalResult) {
+        personalResult = payload.personalResult;
+      } else if (answerForActive) {
+        personalResult = {
+          correct: Boolean(answerForActive.correct),
+          selectedOptionId: answerForActive.optionId || answerForActive.option_id || '',
+          awardedPoints: answerForActive.awardedPoints || answerForActive.awarded_points || 0,
+          responseTimeMs: answerForActive.responseTimeMs || answerForActive.response_time_ms || 0,
+        };
+      } else {
+        personalResult = {
+          correct: false,
+          selectedOptionId: '',
+          awardedPoints: 0,
+          responseTimeMs: 0,
+        };
+      }
+      selectedOptionId = answerForActive ? (answerForActive.optionId || answerForActive.option_id) : (personalResult?.selectedOptionId || null);
+      answerSubmitted = Boolean(answerForActive);
+    } else if (status === 'ROUND_RANKING' || status === 'FINAL_RANKING') {
+      personalResult = payload.personalResult ?? state.personalResult;
+    }
+
+    const pid = payload.playerId ?? state.playerId;
+    const myPlayer = Array.isArray(payload.players) && pid ? payload.players.find((p: any) => p.playerId === pid) : null;
+    const nickname = state.nickname ?? myPlayer?.nickname ?? null;
+
+    let personalScore = state.personalScore;
+    if (payload.personalScore) {
+      personalScore = {
+        totalPoints: payload.personalScore.totalPoints ?? personalScore.totalPoints,
+        correctCount: payload.personalScore.correctCount ?? personalScore.correctCount,
+        position: payload.personalScore.position ?? personalScore.position,
+      };
+    } else if (pid) {
+      if (Array.isArray(payload.scores)) {
+        const myScore = payload.scores.find((s: any) => s.playerId === pid || s.player_id === pid);
+        if (myScore) {
+          personalScore = {
+            totalPoints: myScore.totalPoints ?? myScore.total_points ?? personalScore.totalPoints,
+            correctCount: myScore.correctCount ?? myScore.correct_count ?? personalScore.correctCount,
+            position: personalScore.position,
+          };
+        }
+      }
+      if (Array.isArray(payload.rankings)) {
+        const myRank = payload.rankings.find((r: any) => r.playerId === pid);
+        if (myRank) {
+          personalScore = {
+            ...personalScore,
+            position: myRank.position,
           };
         }
       }
     }
 
-    const pid = payload.playerId ?? state.playerId;
-    let personalScore = state.personalScore;
-    if (pid && Array.isArray(payload.scores)) {
-      const myScore = payload.scores.find((s: any) => s.playerId === pid || s.player_id === pid);
-      if (myScore) {
-        personalScore = {
-          totalPoints: myScore.totalPoints ?? myScore.total_points ?? personalScore.totalPoints,
-          correctCount: myScore.correctCount ?? myScore.correct_count ?? personalScore.correctCount,
-          position: personalScore.position,
-        };
-      }
-    }
-
     const pin = payload.room?.pin ?? state.pin;
-    const reconnectToken = state.reconnectToken ?? (pin ? localStorage.getItem(`batalha_session_${pin}`) : null);
+    const reconnectToken = state.reconnectToken ?? (pin && typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${pin}`) : null);
+    const currentQuestion = payload.currentQuestion !== undefined ? payload.currentQuestion : state.currentQuestion;
+
+    const isCountdown = status === 'COUNTDOWN';
+    const countdownStartedAt = isCountdown
+      ? (state.countdownStartedAt ?? Date.now())
+      : null;
+    const startedAt = isCountdown
+      ? (payload.round?.startedAt ?? countdownStartedAt)
+      : (payload.round?.startedAt ?? (status === 'QUESTION_ACTIVE' ? state.startedAt : null));
+    const deadlineAt = isCountdown
+      ? (payload.round?.deadlineAt ?? (countdownStartedAt ? countdownStartedAt + 3000 : Date.now() + 3000))
+      : (payload.round?.deadlineAt ?? (status === 'QUESTION_ACTIVE' ? state.deadlineAt : null));
+
+    const previousRankings = (state.rankings.length > 0 && Array.isArray(payload.rankings) && state.rankings !== payload.rankings)
+      ? state.rankings
+      : state.previousRankings;
 
     return {
       ...state,
       pin,
+      nickname,
       reconnectToken,
-      roomState: payload.room?.status ?? state.roomState,
-      roomVersion: payload.room?.roomVersion ?? state.roomVersion,
+      roomState: status,
+      roomVersion: incomingVersion,
       entryLocked: payload.room?.entryLocked ?? state.entryLocked,
       currentQuestionIndex: payload.room?.currentQuestionIndex ?? state.currentQuestionIndex,
       players: payload.players ?? state.players,
       presences: payload.presences ?? state.presences,
-      currentQuestion: payload.currentQuestion ?? state.currentQuestion,
-      startedAt: payload.round?.startedAt ?? state.startedAt,
-      deadlineAt: payload.round?.deadlineAt ?? state.deadlineAt,
+      currentQuestion,
+      countdownStartedAt,
+      startedAt,
+      deadlineAt,
       playerId: pid,
       selectedOptionId,
       answerSubmitted,
       answerAcceptedAt,
       personalResult,
       personalScore,
+      rankings: payload.rankings ?? state.rankings,
+      previousRankings,
+      podium: payload.podium ?? state.podium,
+      distribution: payload.distribution ?? (status === 'QUESTION_REVEAL' ? state.distribution : []),
+      correctOptionId: status === 'QUESTION_REVEAL' ? (payload.correctOptionId ?? state.correctOptionId) : null,
+      explanation: status === 'QUESTION_REVEAL' ? (payload.explanation ?? state.explanation) : null,
+      isFinalRanking: payload.isFinalRanking ?? (status === 'FINAL_RANKING'),
+      answeredCount: payload.counts?.answeredCount ?? state.answeredCount,
+      totalEligible: payload.counts?.totalEligible ?? state.totalEligible,
     };
   }),
 
@@ -271,23 +354,34 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     };
   }),
 
-  handleQuestionStarted: (payload) => set({
-    roomState: 'QUESTION_ACTIVE' as GameState,
-    currentQuestion: payload.question,
-    startedAt: payload.startedAt,
-    deadlineAt: payload.deadlineAt,
-    currentQuestionIndex: payload.questionIndex,
-    countdownStartedAt: null,
-    // Reset local answer state
-    selectedOptionId: null,
-    answerSubmitted: false,
-    answerAcceptedAt: null,
-    answerRejected: null,
-    correctOptionId: null,
-    explanation: null,
-    distribution: [],
-    personalResult: null,
+  handleQuestionStarted: (payload) => set((state) => {
+    const isSameQuestion = state.currentQuestion?.id === payload.question.id;
+    return {
+      roomState: 'QUESTION_ACTIVE' as GameState,
+      currentQuestion: payload.question,
+      startedAt: payload.startedAt,
+      deadlineAt: payload.deadlineAt,
+      currentQuestionIndex: payload.questionIndex,
+      countdownStartedAt: null,
+      answeredCount: isSameQuestion ? state.answeredCount : 0,
+      totalEligible: isSameQuestion ? state.totalEligible : 0,
+      // Preserve local answer state if resuming the same question (P1.3)
+      selectedOptionId: isSameQuestion ? state.selectedOptionId : null,
+      answerSubmitted: isSameQuestion ? state.answerSubmitted : false,
+      answerAcceptedAt: isSameQuestion ? state.answerAcceptedAt : null,
+      answerRejected: null,
+      correctOptionId: null,
+      explanation: null,
+      distribution: isSameQuestion ? state.distribution : [],
+      personalResult: null,
+    };
   }),
+
+  handleRoundProgress: (payload) => set((state) => ({
+    answeredCount: payload.answeredCount ?? state.answeredCount,
+    totalEligible: payload.totalEligible ?? state.totalEligible,
+    distribution: payload.distribution ?? state.distribution,
+  })),
 
   handleAnswerAccepted: (payload) => set({
     answerSubmitted: true,

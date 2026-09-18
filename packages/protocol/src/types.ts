@@ -80,6 +80,7 @@ export interface RoomData {
   pin: string;
   status: GameState;
   roomVersion: number;
+  lastStateVersion?: number;
   entryLocked: boolean;
   currentQuestionIndex: number;
   createdAt: number;
@@ -105,11 +106,21 @@ export interface PlayerData {
   removedAt: number | null;
 }
 
+// PRD v1.1 P1.1: Formal presence states
+export const PlayerPresenceStatus = {
+  CONNECTED: 'CONNECTED',
+  TEMPORARILY_DISCONNECTED: 'TEMPORARILY_DISCONNECTED',
+  REMOVED: 'REMOVED',
+} as const;
+
+export type PlayerPresenceStatus = (typeof PlayerPresenceStatus)[keyof typeof PlayerPresenceStatus];
+
 export interface PresenceData {
   playerId: string;
   connectionId: string;
   lastSeenAt: number;
   connected: boolean;
+  status?: PlayerPresenceStatus;
 }
 
 export interface AnswerData {

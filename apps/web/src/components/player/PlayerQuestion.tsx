@@ -58,10 +58,20 @@ export default function PlayerQuestion({
       {/* Visual Hierarchy Header: Badge & Points */}
       <div className="shrink-0">
         <div className="flex justify-between items-center mb-1.5">
-          <span className="text-xs font-bold text-blue-200 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-400/30 uppercase tracking-wider">
-            Questão {currentQuestionIndex + 1} de 10
-          </span>
-          <span className="text-xs font-bold text-yellow-300 bg-yellow-950/40 px-3 py-1 rounded-full border border-yellow-500/30">
+          {currentQuestionIndex === 9 ? (
+            <span className="text-xs font-black text-amber-950 bg-gradient-to-r from-yellow-400 to-amber-500 px-3 py-1 rounded-full border border-yellow-300 uppercase tracking-wider shadow-lg flex items-center gap-1 animate-pulse">
+              🔥 DESAFIO FINAL · Questão 10 de 10
+            </span>
+          ) : (
+            <span className="text-xs font-bold text-blue-200 bg-blue-950/60 px-3 py-1 rounded-full border border-blue-400/30 uppercase tracking-wider">
+              Questão {currentQuestionIndex + 1} de 10
+            </span>
+          )}
+          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+            currentQuestionIndex === 9 
+              ? 'text-yellow-300 bg-yellow-950/80 border-yellow-400 font-black shadow-md' 
+              : 'text-yellow-300 bg-yellow-950/40 border-yellow-500/30'
+          }`}>
             ⭐ {question.basePoints} pontos base
           </span>
         </div>

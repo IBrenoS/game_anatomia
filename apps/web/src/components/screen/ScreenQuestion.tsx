@@ -39,9 +39,15 @@ export default function ScreenQuestion({ question, currentQuestionIndex, deadlin
   return (
     <div className="flex flex-col h-full text-white p-8 md:p-10 max-w-7xl mx-auto w-full select-none justify-between">
       <div className="flex justify-between items-center mb-4">
-        <span className="text-2xl md:text-3xl font-black text-blue-200 bg-blue-950/60 px-6 py-2 rounded-2xl border border-blue-400/30">
-          Questão {currentQuestionIndex + 1} de 10
-        </span>
+        {currentQuestionIndex === 9 ? (
+          <span className="text-2xl md:text-3xl font-black text-amber-950 bg-gradient-to-r from-yellow-400 to-amber-500 px-6 py-2 rounded-2xl border-2 border-yellow-300 shadow-[0_0_25px_rgba(250,204,21,0.6)] animate-pulse uppercase tracking-wider">
+            🔥 DESAFIO FINAL (300 PTS) · Questão 10 de 10 🔥
+          </span>
+        ) : (
+          <span className="text-2xl md:text-3xl font-black text-blue-200 bg-blue-950/60 px-6 py-2 rounded-2xl border border-blue-400/30">
+            Questão {currentQuestionIndex + 1} de 10
+          </span>
+        )}
         <div className={`text-5xl md:text-6xl font-mono font-black px-8 py-2.5 rounded-2xl border transition-all ${
           timeLeft <= 10 
             ? 'bg-red-600/90 border-red-400 text-white motion-safe:animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.5)]' 

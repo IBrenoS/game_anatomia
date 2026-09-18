@@ -16,6 +16,9 @@ export function useGameSocket() {
     if (initialized.current) return;
     initialized.current = true;
 
+    // Sync current manager state immediately on mount
+    useGameStore.getState().setConnectionState(wsManager.state);
+
     // Register state change listener
     const unsubscribeState = wsManager.onStateChange((state) => {
       useGameStore.getState().setConnectionState(state);
@@ -45,6 +48,9 @@ export function useGameSocket() {
       }),
       wsManager.onEvent(ServerEventType.QUESTION_STARTED, (payload) => {
         useGameStore.getState().handleQuestionStarted(payload);
+      }),
+      wsManager.onEvent(ServerEventType.ROUND_PROGRESS, (payload) => {
+        useGameStore.getState().handleRoundProgress(payload);
       }),
       wsManager.onEvent(ServerEventType.ANSWER_ACCEPTED, (payload) => {
         useGameStore.getState().handleAnswerAccepted(payload);

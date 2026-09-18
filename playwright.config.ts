@@ -6,7 +6,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  timeout: 120_000,
+  timeout: 240_000,
   expect: {
     timeout: 10_000,
   },
@@ -18,6 +18,17 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /.*mobile-lifecycle\.spec\.ts/,
+    },
+    {
+      name: 'android-chrome',
+      use: { ...devices['Pixel 5'] },
+      testMatch: /.*mobile-lifecycle\.spec\.ts/,
+    },
+    {
+      name: 'ios-safari',
+      use: { ...devices['iPhone 12'] },
+      testMatch: /.*mobile-lifecycle\.spec\.ts/,
     },
   ],
   webServer: {

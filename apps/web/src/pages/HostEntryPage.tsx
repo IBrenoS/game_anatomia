@@ -15,11 +15,9 @@ export const HostEntryPage: React.FC = () => {
     setErrorMessage(null);
 
     try {
-      const { pin, joinUrl, hostToken } = await createRoom();
+      const { pin, joinUrl } = await createRoom();
       
-      // Store host credentials
-      localStorage.setItem(`batalha_host_${pin}`, hostToken);
-      useGameStore.getState().setHostData({ hostToken, joinUrl, pin });
+      useGameStore.getState().setHostData({ joinUrl, pin });
 
       // Navigate to host management room
       navigate(`/host/${pin}`);

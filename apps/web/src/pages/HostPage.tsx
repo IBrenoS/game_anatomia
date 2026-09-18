@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { useGameStore } from '../stores/gameStore.js';
 import { useGameSocket } from '../hooks/useGameSocket.js';
 import HostLobby from '../components/host/HostLobby.js';
@@ -12,10 +12,8 @@ import CountdownDisplay from '../components/shared/CountdownDisplay.js';
 
 export function HostPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
-  const [searchParams] = useSearchParams();
-  const pin = routePin || searchParams.get('pin') || '';
-  const storedHostToken = useGameStore((s) => s.hostToken);
-  const token = storedHostToken || searchParams.get('token') || (pin ? localStorage.getItem(`batalha_host_${pin}`) : '') || '';
+  const navigate = useNavigate();
+  const pin = routePin || '';
   const { connect, connectionState } = useGameSocket();
 
   const roomState = useGameStore((s) => s.roomState);
@@ -33,11 +31,10 @@ export function HostPage() {
   const podium = useGameStore((s) => s.podium);
 
   useEffect(() => {
-    if (pin && token) {
-      localStorage.setItem(`batalha_host_${pin}`, token);
-      connect(pin, 'host', token);
+    if (pin) {
+      connect(pin, 'host');
     }
-  }, [pin, token, connect]);
+  }, [pin, connect]);
 
   if (connectionState === 'disconnected' || connectionState === 'connecting') {
     return <div className="min-h-screen bg-[#1e3a5f] text-white flex items-center justify-center">Conectando ao painel do apresentador...</div>;
@@ -60,7 +57,37 @@ export function HostPage() {
       case 'PODIUM':
         return <HostPodium podium={podium} />;
       case 'FINISHED':
-        return <div className="flex-1 flex flex-col items-center justify-center"><h2 className="text-4xl font-bold text-white">Partida Encerrada</h2></div>;
+        return (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-6">
+            <span className="text-6xl">🏁</span>
+            <h2 className="text-4xl font-black text-white">Partida Encerrada</h2>
+            <p className="text-blue-200 text-lg max-w-md">
+              A batalha foi concluída com sucesso. Você pode iniciar uma nova partida ou voltar ao início.
+            </p>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  useGameStore.getState().resetStore();
+                  navigate('/host');
+                }}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl shadow transition-all cursor-pointer"
+              >
+                Nova Partida
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  useGameStore.getState().resetStore();
+                  navigate('/');
+                }}
+                className="px-6 py-3 bg-white/10 hover:bg-white/20 font-bold text-white rounded-xl transition-all cursor-pointer"
+              >
+                Voltar ao Início
+              </button>
+            </div>
+          </div>
+        );
       default:
         return <div className="flex-1 flex items-center justify-center text-white">Aguardando estado do jogo...</div>;
     }

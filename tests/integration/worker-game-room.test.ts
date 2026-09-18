@@ -13,6 +13,7 @@ import {
   TOTAL_QUESTIONS,
 } from '@batalha/protocol';
 import { questions } from '@batalha/content';
+import { getRoomPlayerCounts } from '@batalha/game';
 
 interface WsTestClient {
   server: MockWebSocket;
@@ -92,13 +93,13 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const data = await res.json() as any;
       expect(data.pin).toBeDefined();
       expect(data.pin.length).toBe(6);
-      expect(data.hostToken).toBeDefined();
+      expect(data.hostToken).toBeUndefined();
       expect(data.joinUrl).toContain(data.pin);
 
       // Verify HttpOnly cookie
       const setCookie = res.headers.get('Set-Cookie');
       expect(setCookie).toBeDefined();
-      expect(setCookie).toContain(`batalha_host_${data.pin}=${data.hostToken}`);
+      expect(setCookie).toContain(`batalha_host_${data.pin}=`);
       expect(setCookie).toContain('HttpOnly');
       expect(setCookie).toContain('SameSite=Strict');
     });
@@ -390,7 +391,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const realNow = Date.now;
       Date.now = () => heartbeatAt;
       try {
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: 9999 }, 0));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
         await room.alarm();
 
         const question = questions[0];
@@ -434,7 +435,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await bobClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
 
       // Start game: LOBBY -> COUNTDOWN -> QUESTION_ACTIVE
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: 9999 }, 1));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
       // Trigger alarm to finish COUNTDOWN and start Question 1
       await room.alarm();
       aliceClient.clearMessages();
@@ -534,8 +535,8 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       }, 0));
 
       // Host advances to Question 1 (index 1)
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: 9999 }, 0));
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: 9999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       await room.alarm(); // Question index 1 is now active!
 
       const q2 = questions[1];
@@ -602,7 +603,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       aliceClient = attachTestClient(room, pServer, pServer.peer!);
       await aliceClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
 
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: 9999 }, 1));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
       await room.alarm(); // Start Question 1
       aliceClient.clearMessages();
     });
@@ -611,7 +612,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const q1 = questions[0];
 
       // 1. Host pauses game
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: 9999 }, 3));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: (room as any).room.roomVersion }, 3));
 
       // 2. Submitting answer while paused is rejected
       await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
@@ -625,7 +626,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect(rejected.payload.code).toBe(ProtocolError.QUESTION_NOT_ACTIVE);
 
       // 3. Host resumes game
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: 9999 }, 4));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 4));
       await room.alarm(); // Finishes resume countdown and reactivates question
 
       // 4. Submit answer after resume -> accepted
@@ -651,7 +652,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         mockNow += 4000;
 
         // 2. Host pauses game
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: 9999 }, 2));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: (room as any).room.roomVersion }, 2));
 
         // Submitting while paused is rejected with QUESTION_NOT_ACTIVE
         await aliceClient.send(createClientEnvelope('SUBMIT_ANSWER', {
@@ -666,7 +667,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         mockNow += 30_000;
 
         // 4. Host resumes
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: 9999 }, 4));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 4));
         mockNow += 3000;
         await room.alarm(); // Resume countdown ends
 
@@ -683,7 +684,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         expect(accepted).toBeDefined();
 
         // 6. Host ends question to reveal points and verify speed bonus was awarded (100 * 1.25 = 125)
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_QUESTION', expectedRoomVersion: 9999 }, 6));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_QUESTION', expectedRoomVersion: (room as any).room.roomVersion }, 6));
         const reveal = aliceClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REVEAL);
         expect(reveal).toBeDefined();
         expect(reveal.payload.personalResult.awardedPoints).toBe(125);
@@ -709,7 +710,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Champion' }, 0));
 
       // Start game
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: 99999 }, 1));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
       await room.alarm(); // starts Question 0 (Q1)
 
       // Play questions 0 through 8 (Q1 to Q9)
@@ -723,10 +724,10 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         }, 0));
 
         // Host shows ranking -> transitions to ROUND_RANKING for Q1–Q9
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: 99999 }, 0));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
 
         // Host advances to next question
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: 99999 }, 0));
+        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: (room as any).room.roomVersion }, 0));
         await room.alarm(); // Countdown alarm -> starts next question
       }
 
@@ -743,7 +744,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // On Question 10, SHOW_RANKING must transition directly to FINAL_RANKING
       hostClient.clearMessages();
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: 99999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
 
       const rankEvent = hostClient.getAllMessages().find(m => m.type === ServerEventType.RANKING_UPDATED);
       expect(rankEvent).toBeDefined();
@@ -756,7 +757,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // From FINAL_RANKING to PODIUM
       hostClient.clearMessages();
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_PODIUM', expectedRoomVersion: 99999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_PODIUM', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       const stateChange2 = hostClient.getAllMessages().find(
         m => m.type === ServerEventType.GAME_STATE_CHANGED && m.payload.state === GameState.PODIUM
       );
@@ -764,7 +765,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // From PODIUM to FINISHED
       hostClient.clearMessages();
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_GAME', expectedRoomVersion: 99999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       const stateChange3 = hostClient.getAllMessages().find(
         m => m.type === ServerEventType.GAME_STATE_CHANGED && m.payload.state === GameState.FINISHED
       );
@@ -785,7 +786,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'CleanTest' }, 0));
 
       // End game
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_GAME', expectedRoomVersion: 99999 }, 0));
+      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'END_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       expect((room as any).room.status).toBe(GameState.FINISHED);
 
       // Trigger cleanup alarm
@@ -798,6 +799,472 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect(sql.exec('SELECT count(*) as cnt FROM scores').toArray()[0].cnt).toBe(0);
       expect(sql.exec('SELECT count(*) as cnt FROM rounds').toArray()[0].cnt).toBe(0);
       expect(sql.exec('SELECT count(*) as cnt FROM players').toArray()[0].cnt).toBe(0);
+    });
+  });
+
+  describe('T1–T17 Comprehensive Specification Verification Suite', () => {
+    it('T1 & T3: happy path with 2 players closes immediately when all answer, auto-progresses without host commands', async () => {
+      // Connect host
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      // Connect Player A
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'PlayerA' }, 0));
+
+      // Connect Player B
+      const p2Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p2Req);
+      const p2Ws = ctx.getWebSockets('role:player')[1];
+      const p2 = attachTestClient(room, p2Ws, p2Ws.peer!);
+      await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'PlayerB' }, 0));
+
+      // Host starts game: LOBBY -> COUNTDOWN
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      expect((room as any).room.status).toBe(GameState.COUNTDOWN);
+
+      // Countdown finishes -> QUESTION_ACTIVE (Q1)
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+      expect((room as any).room.currentQuestionIndex).toBe(0);
+
+      // Player A answers -> round stays active (B hasn't answered yet)
+      const q1 = questions[0];
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+
+      // Player B answers -> all answered! Question closes immediately -> QUESTION_REVEAL
+      await p2.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.options[1].id,
+      }, 0));
+      expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+
+      // Automated Reveal alarm (5s) -> ROUND_RANKING (WITHOUT HOST ACTION!)
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.ROUND_RANKING);
+
+      // Automated Ranking alarm (5s) -> COUNTDOWN (3s) (WITHOUT HOST ACTION!)
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.COUNTDOWN);
+
+      // Automated Countdown alarm (3s) -> QUESTION_ACTIVE (Q2)
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+      expect((room as any).room.currentQuestionIndex).toBe(1);
+    });
+
+    it('T2: when 1 student answers out of 3, host gets distribution, screen does not leak, round stays open', async () => {
+      // Connect host & 3 players & screen
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const screenReq = new Request('http://internal/ws?role=screen', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(screenReq);
+      const screenWs = ctx.getWebSockets('role:screen')[0];
+      const screenTestClient = attachTestClient(room, screenWs, screenWs.peer!);
+
+      const pClients: WsTestClient[] = [];
+      for (const name of ['Alice', 'Bob', 'Charlie']) {
+        const pReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+        await room.fetch(pReq);
+        const sockets = ctx.getWebSockets('role:player');
+        const pWs = sockets[sockets.length - 1];
+        const client = attachTestClient(room, pWs, pWs.peer!);
+        await client.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: name }, 0));
+        pClients.push(client);
+      }
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // start Q1
+
+      hostTestClient.clearMessages();
+      screenTestClient.clearMessages();
+      pClients[0].clearMessages();
+
+      // Alice answers
+      const q1 = questions[0];
+      await pClients[0].send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+
+      // Alice receives ANSWER_ACCEPTED (no correct/incorrect reveal!)
+      const aliceAccepted = pClients[0].getAllMessages().find(m => m.type === ServerEventType.ANSWER_ACCEPTED);
+      expect(aliceAccepted).toBeDefined();
+
+      // Host receives ROUND_PROGRESS with option distribution
+      const hostProgress = hostTestClient.getAllMessages().find(m => m.type === ServerEventType.ROUND_PROGRESS);
+      expect(hostProgress).toBeDefined();
+      expect(hostProgress.payload.answeredCount).toBe(1);
+      expect(hostProgress.payload.totalEligible).toBe(3);
+      expect(hostProgress.payload.distribution).toBeDefined();
+
+      // Screen receives ROUND_PROGRESS with counts only (NO distribution!)
+      const screenProgress = screenTestClient.getAllMessages().find(m => m.type === ServerEventType.ROUND_PROGRESS);
+      expect(screenProgress).toBeDefined();
+      expect(screenProgress.payload.answeredCount).toBe(1);
+      expect(screenProgress.payload.distribution).toBeUndefined();
+
+      // Round remains active!
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+    });
+
+    it('T4: timeout when player does not answer automatically closes round and awards 0 points', async () => {
+      // Connect host & 1 player
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const pReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(pReq);
+      const pWs = ctx.getWebSockets('role:player')[0];
+      const pClient = attachTestClient(room, pWs, pWs.peer!);
+      await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'SlowPlayer' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // start Q1
+
+      // Player does NOT answer. Deadline alarm fires!
+      pClient.clearMessages();
+      await room.alarm(); // fires endCurrentQuestion('deadline')
+
+      expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+      const reveal = pClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REVEAL);
+      expect(reveal).toBeDefined();
+      // No personal result for unanswered player -> awardedPoints: 0
+      expect(reveal.payload.personalResult).toBeNull();
+    });
+
+    it('T7: closed browser (websocket close) marks player disconnected and does not block allAnswered', async () => {
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      // Connect Alice & João
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+
+      const p2Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p2Req);
+      const p2Ws = ctx.getWebSockets('role:player')[1];
+      const p2 = attachTestClient(room, p2Ws, p2Ws.peer!);
+      await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Joao' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // Q1 active
+
+      // João closes browser
+      await room.webSocketClose(p2Ws as any, 1000, 'Browser closed');
+
+      // Alice answers -> since João is disconnected, Alice is the ONLY active eligible player!
+      const q1 = questions[0];
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+
+      // Round ends immediately because all ACTIVE eligible players answered!
+      expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+    });
+
+    it('T9: pause and resume preserves registered answer for player who already answered', async () => {
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+      const alicePlayerId = p1.getAllMessages().find(m => m.type === ServerEventType.SESSION_ACCEPTED).payload.playerId;
+
+      const p2Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p2Req);
+      const p2Ws = ctx.getWebSockets('role:player')[1];
+      const p2 = attachTestClient(room, p2Ws, p2Ws.peer!);
+      await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // start Q1
+
+      // Alice answers
+      const q1 = questions[0];
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.correctOptionId,
+      }, 0));
+
+      // Host pauses
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      expect((room as any).room.status).toBe(GameState.PAUSED);
+
+      // Host resumes -> COUNTDOWN
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      expect((room as any).room.status).toBe(GameState.COUNTDOWN);
+      await room.alarm(); // resumes QUESTION_ACTIVE
+
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+
+      // Alice's answer in database is intact
+      const answers = (room as any).sql.exec('SELECT * FROM answers WHERE player_id = ?', alicePlayerId).toArray();
+      expect(answers.length).toBe(1);
+
+      // Alice re-submitting a different answer is rejected
+      p1.clearMessages();
+      const differentOption = q1.options.find(o => o.id !== q1.correctOptionId)!;
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: differentOption.id,
+      }, 0));
+      const rejected = p1.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REJECTED);
+      expect(rejected?.payload?.code).toBe(ProtocolError.ANSWER_ALREADY_SUBMITTED);
+    });
+
+    it('T10: host command succeeds when roomVersion advanced due to concurrent player answers (lastStateVersion buffer)', async () => {
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+
+      const p2Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p2Req);
+      const p2Ws = ctx.getWebSockets('role:player')[1];
+      const p2 = attachTestClient(room, p2Ws, p2Ws.peer!);
+      await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // start Q1
+
+      // Host saw roomVersion at start of Q1
+      const hostKnownVersion = (room as any).room.roomVersion;
+      expect((room as any).room.lastStateVersion).toBe(hostKnownVersion);
+
+      // Alice answers -> increments roomVersion on server!
+      const q1 = questions[0];
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: q1.id,
+        questionVersion: 0,
+        optionId: q1.options[0].id,
+      }, 0));
+
+      expect((room as any).room.roomVersion).toBeGreaterThan(hostKnownVersion);
+
+      // Host sends PAUSE with its slightly older expectedRoomVersion (P0.6 concurrency resolution)
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', {
+        command: 'PAUSE',
+        expectedRoomVersion: hostKnownVersion, // Not latest, but >= lastStateVersion!
+      }, 0));
+
+      // Must succeed!
+      expect((room as any).room.status).toBe(GameState.PAUSED);
+    });
+
+    it('T11: rejects future versions (questionVersion > current or expectedRoomVersion > server roomVersion)', async () => {
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // Q1 (index 0)
+
+      // 1. Future questionVersion (9999) -> rejected with INVALID_PAYLOAD
+      p1.clearMessages();
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: questions[0].id,
+        questionVersion: 9999, // Future!
+        optionId: questions[0].options[0].id,
+      }, 0));
+      const rejectedAnswer = p1.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REJECTED);
+      expect(rejectedAnswer?.payload?.code).toBe(ProtocolError.INVALID_PAYLOAD);
+
+      // 2. Future expectedRoomVersion (9999) -> rejected with INVALID_PAYLOAD
+      hostTestClient.clearMessages();
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', {
+        command: 'PAUSE',
+        expectedRoomVersion: 9999, // Future!
+      }, 0));
+      const hostError = hostTestClient.getAllMessages().find(m => m.type === ServerEventType.ERROR);
+      expect(hostError?.payload?.code).toBe(ProtocolError.INVALID_PAYLOAD);
+    });
+
+    it('T12: 1 player plays all 10 questions to podium and finished automatically', async () => {
+      const hostReq = new Request(`http://internal/ws?role=host&token=${testHostToken}`, { headers: { Upgrade: 'websocket' } });
+      await room.fetch(hostReq);
+      const hostWs = ctx.getWebSockets('role:host')[0];
+      const hostTestClient = attachTestClient(room, hostWs, hostWs.peer!);
+
+      const p1Req = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(p1Req);
+      const p1Ws = ctx.getWebSockets('role:player')[0];
+      const p1 = attachTestClient(room, p1Ws, p1Ws.peer!);
+      await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'SoloHero' }, 0));
+
+      await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await room.alarm(); // start Q1
+
+      // Play questions 0 through 8 (Q1 to Q9)
+      for (let i = 0; i < 9; i++) {
+        expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+        expect((room as any).room.currentQuestionIndex).toBe(i);
+        await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: questions[i].id,
+          questionVersion: i,
+          optionId: questions[i].correctOptionId,
+        }, 0));
+        expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+        await room.alarm(); // -> ROUND_RANKING
+        expect((room as any).room.status).toBe(GameState.ROUND_RANKING);
+        await room.alarm(); // -> COUNTDOWN
+        expect((room as any).room.status).toBe(GameState.COUNTDOWN);
+        await room.alarm(); // -> next QUESTION_ACTIVE
+      }
+
+      // Q10
+      expect((room as any).room.currentQuestionIndex).toBe(9);
+      expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
+      await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: questions[9].id,
+        questionVersion: 9,
+        optionId: questions[9].correctOptionId,
+      }, 0));
+      expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
+
+      // Automated transition: QUESTION_REVEAL -> FINAL_RANKING
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.FINAL_RANKING);
+
+      // Automated transition: FINAL_RANKING -> PODIUM
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.PODIUM);
+
+      // Automated transition: PODIUM -> FINISHED
+      await room.alarm();
+      expect((room as any).room.status).toBe(GameState.FINISHED);
+    });
+
+    it('T15: player counters totalPlayers, connectedPlayers, eligiblePlayers are consistent', () => {
+      const now = Date.now();
+      const mockPlayers: any[] = [
+        { playerId: 'p1', nickname: 'Alice', joinedAt: now, eligibleFromQuestion: 0, removedAt: null },
+        { playerId: 'p2', nickname: 'Bob', joinedAt: now, eligibleFromQuestion: 2, removedAt: null },
+        { playerId: 'p3', nickname: 'Charlie', joinedAt: now, eligibleFromQuestion: 0, removedAt: now },
+      ];
+      const mockPresences: any[] = [
+        { playerId: 'p1', connectionId: 'c1', lastSeenAt: now, connected: true },
+        { playerId: 'p2', connectionId: 'c2', lastSeenAt: now - 30_000, connected: false },
+        { playerId: 'p3', connectionId: 'c3', lastSeenAt: now, connected: true },
+      ];
+
+      const counts = getRoomPlayerCounts(mockPlayers as any, mockPresences as any, 0, now);
+
+      // Alice (eligible, connected)
+      // Bob (not eligible for Q0, disconnected)
+      // Charlie (removed -> doesn't count in totalPlayers)
+      expect(counts).toBeDefined();
+      expect(counts.totalPlayers).toBe(2); // Alice and Bob
+      expect(counts.connectedPlayers).toBe(1); // Alice only
+      expect(counts.eligiblePlayers).toBe(1); // Alice only (Bob eligibleFrom 2)
+    });
+
+    it('T16: adaptive podium yields exact participant subsets for 1, 2, and 5 players', async () => {
+      // 1 player
+      const scores1 = [{ playerId: 'p1', totalPoints: 500, correctCount: 5, correctResponseTimeMs: 10000 }];
+      const players1 = [{ playerId: 'p1', nickname: 'Alice', joinedAt: 0, eligibleFromQuestion: 0, removedAt: null }];
+      const rank1 = (room as any).computeRanking.call({ getScores: () => scores1, getActivePlayers: () => players1 });
+      expect(rank1.slice(0, 3)).toHaveLength(1);
+      expect(rank1[0].position).toBe(1);
+
+      // 2 players
+      const scores2 = [
+        { playerId: 'p1', totalPoints: 500, correctCount: 5, correctResponseTimeMs: 10000 },
+        { playerId: 'p2', totalPoints: 300, correctCount: 3, correctResponseTimeMs: 12000 },
+      ];
+      const players2 = [
+        { playerId: 'p1', nickname: 'Alice', joinedAt: 0, eligibleFromQuestion: 0, removedAt: null },
+        { playerId: 'p2', nickname: 'Bob', joinedAt: 0, eligibleFromQuestion: 0, removedAt: null },
+      ];
+      const rank2 = (room as any).computeRanking.call({ getScores: () => scores2, getActivePlayers: () => players2 });
+      expect(rank2.slice(0, 3)).toHaveLength(2);
+      expect(rank2[0].position).toBe(1);
+      expect(rank2[1].position).toBe(2);
+
+      // 5 players
+      const scores5 = Array.from({ length: 5 }, (_, i) => ({
+        playerId: `p${i + 1}`,
+        totalPoints: (5 - i) * 100,
+        correctCount: 5 - i,
+        correctResponseTimeMs: 10000,
+      }));
+      const players5 = Array.from({ length: 5 }, (_, i) => ({
+        playerId: `p${i + 1}`,
+        nickname: `Player${i + 1}`,
+        joinedAt: 0,
+        eligibleFromQuestion: 0,
+        removedAt: null,
+      }));
+      const rank5 = (room as any).computeRanking.call({ getScores: () => scores5, getActivePlayers: () => players5 });
+      const podium5 = rank5.slice(0, 3);
+      expect(podium5).toHaveLength(3);
+      expect(podium5[0].position).toBe(1);
+      expect(podium5[1].position).toBe(2);
+      expect(podium5[2].position).toBe(3);
+    });
+
+    it('T17: PIN alone does not authorize host commands; hostToken not leaked in JSON', async () => {
+      // Connect client as player
+      const pReq = new Request('http://internal/ws?role=player', { headers: { Upgrade: 'websocket' } });
+      await room.fetch(pReq);
+      const pWs = ctx.getWebSockets('role:player')[0];
+      const pClient = attachTestClient(room, pWs, pWs.peer!);
+      await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Hacker' }, 0));
+
+      // Player attempts to send HOST_COMMAND (e.g. START_GAME) using only the PIN
+      pClient.clearMessages();
+      await pClient.send(createClientEnvelope('HOST_COMMAND', {
+        command: 'START_GAME',
+        expectedRoomVersion: 0,
+      }, 0));
+
+      const errorMsg = pClient.getAllMessages().find(m => m.type === ServerEventType.ERROR);
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg.payload.code).toBe(ProtocolError.UNAUTHORIZED);
     });
   });
 });

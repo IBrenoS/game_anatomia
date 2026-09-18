@@ -1,24 +1,26 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Batalha Anatômica — Full 10-Question Arena E2E Suite (P3.3)
- * Covering:
- * - Host opens room from /host and gets PIN and QR code
- * - Screen opens on /screen/:pin and synchronizes in real time
- * - Player 1 (Alice) joins via /join/:pin
- * - Duplicate nickname rejection ('alice' / case-insensitive)
- * - Player 2 (Bob) and Player 3 (Charlie) join
- * - Synchronized 3-2-1 countdown across Host, Screen, and Players
- * - Full 10-question execution with answer locking and feedback
- * - Mid-game player page reload / reconnection preserving session and score
- * - Question 10 300pt challenge and transition: QUESTION_REVEAL -> FINAL_RANKING
- * - Sequential Podium ceremony and final completion
+ * Batalha Anatômica — Full 10-Question Arena E2E Suite (Section 9 / P0.10–P0.24)
+ * Mandatory Requirements:
+ * - Host + 2 Players (Alice + Bob) + Screen
+ * - Complete 10 questions without clicking "Próxima pergunta" or "Ver classificação"
+ * - Observe game as a real user via automated server transitions
+ * - Duplicate nickname validation
+ * - Mid-game reload/reconnection preserving state
+ * - Question 10 DESAFIO FINAL visual treatment
+ * - Automatic transition: QUESTION_ACTIVE -> QUESTION_REVEAL (5s) -> ROUND_RANKING (5s) -> COUNTDOWN (3s) -> next
+ * - Question 10 -> QUESTION_REVEAL (5s) -> FINAL_RANKING (5s) -> PODIUM (10s) -> FINISHED
+ * - Adaptive podium for 2 participants
+ * - FINISHED navigation: player returns to home, host creates new game
  */
 
-test.describe('Batalha Anatômica — Complete 10-Question E2E Suite', () => {
-  test('Full Arena Game Lifecycle: Host + Screen + 3 Players through 10 Questions to Podium', async ({
+test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite', () => {
+  test('Full Arena Game Lifecycle: Host + Screen + 2 Players through 10 Questions to Podium & Finished (Fully Automated Loop)', async ({
     browser,
   }) => {
+    test.setTimeout(240_000);
+
     // -------------------------------------------------------------
     // 1. Host Surface (/host)
     // -------------------------------------------------------------
@@ -42,7 +44,7 @@ test.describe('Batalha Anatômica — Complete 10-Question E2E Suite', () => {
     await expect(hostPage.getByAltText(new RegExp(`QR Code para entrar na sala ${pin}`))).toBeVisible();
 
     // -------------------------------------------------------------
-    // 2. Telão / Big Screen Surface (/screen/:pin) (P1.1)
+    // 2. Telão / Big Screen Surface (/screen/:pin)
     // -------------------------------------------------------------
     const screenContext = await browser.newContext();
     const screenPage = await screenContext.newPage();
@@ -65,16 +67,14 @@ test.describe('Batalha Anatômica — Complete 10-Question E2E Suite', () => {
 
     // Alice lands on /play/:pin in lobby
     await expect(alicePage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
-    // Reload ensures fresh connectionState on PlayerPage with saved session token
-    await alicePage.reload();
     await expect(alicePage.getByText('Alice').first()).toBeVisible({ timeout: 10000 });
 
-    // Host and Screen reflect 1 participant
+    // Host and Screen reflect Alice
     await expect(hostPage.getByText('Alice')).toBeVisible();
     await expect(screenPage.getByText('Alice')).toBeVisible();
 
     // -------------------------------------------------------------
-    // 4. Duplicate Nickname Rejection (P0.2)
+    // 4. Duplicate Nickname Rejection
     // -------------------------------------------------------------
     const bobContext = await browser.newContext();
     const bobPage = await bobContext.newPage();
@@ -90,128 +90,125 @@ test.describe('Batalha Anatômica — Complete 10-Question E2E Suite', () => {
     await expect(bobPage.getByRole('alert')).toBeVisible({ timeout: 5000 });
     await expect(bobPage.getByText(/já está em uso/i)).toBeVisible();
 
-    // Reload join page and enter unique name Bob
-    await bobPage.goto(`/join/${pin}`);
-    const bobInput2 = bobPage.getByLabel(/seu apelido/i);
-    await expect(bobInput2).toBeVisible({ timeout: 10000 });
-    await bobInput2.fill('Bob');
+    // Enter unique name Bob
+    await bobInput.fill('Bob');
     await bobPage.getByRole('button', { name: /entrar na arena/i }).click();
     await expect(bobPage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
-    await bobPage.reload();
     await expect(bobPage.getByText('Bob').first()).toBeVisible({ timeout: 10000 });
 
-    // -------------------------------------------------------------
-    // 5. Player 3: Charlie Joins
-    // -------------------------------------------------------------
-    const charlieContext = await browser.newContext();
-    const charliePage = await charlieContext.newPage();
-    await charliePage.goto(`/join/${pin}`);
-    await charliePage.getByLabel(/seu apelido/i).fill('Charlie');
-    await charliePage.getByRole('button', { name: /entrar na arena/i }).click();
-    await expect(charliePage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
-    await charliePage.reload();
-    await expect(charliePage.getByText('Charlie').first()).toBeVisible({ timeout: 10000 });
-
-    // Host and Screen see all 3 players
-    await expect(hostPage.getByText('Charlie')).toBeVisible();
-    await expect(screenPage.getByText('3 / 50')).toBeVisible();
+    // Host and Screen see both participants (2 / 50)
+    await expect(hostPage.getByText('Bob')).toBeVisible();
+    await expect(screenPage.getByText('2 / 50')).toBeVisible();
 
     // -------------------------------------------------------------
-    // 6. Host Starts the Game -> Countdown (P1.2)
+    // 5. Host Starts the Game -> Countdown
     // -------------------------------------------------------------
     const startPartidaBtn = hostPage.getByRole('button', { name: /iniciar partida/i }).first();
     await expect(startPartidaBtn).toBeVisible();
     await startPartidaBtn.click();
 
-    // Verify Portuguese countdown on Screen
+    // Verify synchronized countdown across Screen and Players
     await expect(screenPage.getByText(/prepare-se/i)).toBeVisible({ timeout: 5000 });
+    await expect(alicePage.getByText(/prepare-se/i)).toBeVisible({ timeout: 5000 });
+    await expect(bobPage.getByText(/prepare-se/i)).toBeVisible({ timeout: 5000 });
 
     // -------------------------------------------------------------
-    // 7. Execute All 10 Questions
+    // 6. Execute All 10 Questions via Automated Game Loop (NO MANUAL ADVANCE CLICKS!)
     // -------------------------------------------------------------
     for (let qNum = 1; qNum <= 10; qNum++) {
       // A. Verify question is active across clients
       const qProgress = new RegExp(`questão ${qNum} de 10`, 'i');
-      await expect(alicePage.getByText(qProgress)).toBeVisible({ timeout: 12000 });
-      await expect(bobPage.getByText(qProgress)).toBeVisible({ timeout: 12000 });
-      await expect(charliePage.getByText(qProgress)).toBeVisible({ timeout: 12000 });
+      await expect(alicePage.getByText(qProgress)).toBeVisible({ timeout: 15000 });
+      await expect(bobPage.getByText(qProgress)).toBeVisible({ timeout: 15000 });
+
+      // Special visual atmosphere on Question 10 (P1.14)
+      if (qNum === 10) {
+        await expect(alicePage.getByText(/desafio final/i)).toBeVisible();
+        await expect(screenPage.getByText(/desafio final/i)).toBeVisible();
+      }
 
       // Option buttons exist
       const aliceOptA = alicePage.getByRole('button', { name: /alternativa a/i }).first();
       const bobOptB = bobPage.getByRole('button', { name: /alternativa b/i }).first();
-      const charlieOptA = charliePage.getByRole('button', { name: /alternativa a/i }).first();
       await expect(aliceOptA).toBeVisible({ timeout: 5000 });
 
-      // B. Players submit answers with optimistic click locking (P1.4)
+      // Mid-game reconnection check on Question 5: Bob reloads before answering
+      if (qNum === 5) {
+        await bobPage.reload();
+        await expect(bobPage.getByText(qProgress)).toBeVisible({ timeout: 8000 });
+      }
+
+      // B. Alice submits answer -> sees "Resposta registrada" neutral confirmation
       await aliceOptA.click();
-      await expect(alicePage.getByText(/resposta registrada|resposta incorreta|você acertou/i)).toBeVisible({ timeout: 5000 });
+      await expect(alicePage.getByText(/resposta registrada/i)).toBeVisible({ timeout: 5000 });
 
-      await bobOptB.click();
-      await expect(bobPage.getByText(/resposta registrada|resposta incorreta|você acertou/i)).toBeVisible({ timeout: 5000 });
+      // B2. Bob submits answer (as the last eligible player, triggers immediate round close)
+      const bobOpt = bobPage.getByRole('button', { name: /alternativa b/i }).first();
+      await bobOpt.click();
+      await expect(bobPage.getByText(/resposta registrada|você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
 
-      await charlieOptA.click();
-      await expect(charliePage.getByText(/resposta registrada|resposta incorreta|você acertou/i)).toBeVisible({ timeout: 5000 });
-
-      // C. All answered -> server transitions automatically to QUESTION_REVEAL (P1.3)
+      // C. All active players have answered! Server automatically ends question -> QUESTION_REVEAL
       // Screen displays reveal and distribution
       await expect(screenPage.getByText(/gabarito da pergunta/i)).toBeVisible({ timeout: 8000 });
 
-      // Host displays ranking advancement button
-      const showRankingBtn = hostPage.getByRole('button', { name: /ver classificação/i });
-      await expect(showRankingBtn).toBeVisible({ timeout: 8000 });
-      await showRankingBtn.click();
+      // Players see their personal results (correct/wrong, points, accumulated score)
+      await expect(alicePage.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
+      await expect(bobPage.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
 
-      // D. Ranking View
+      // D. Automatic Advancement (NO HOST CLICKS!)
       if (qNum < 10) {
-        // Questions 1–9: Host shows next question button
-        await expect(hostPage.getByRole('button', { name: /próxima pergunta/i })).toBeVisible({ timeout: 8000 });
-        await expect(screenPage.getByText(/top 5 da batalha/i)).toBeVisible({ timeout: 8000 });
+        // Automatically transitions to ROUND_RANKING (~5s alarm)
+        await expect(screenPage.getByText(/top 5 da batalha/i)).toBeVisible({ timeout: 10000 });
 
-        // Mid-game test on Question 5: Test Bob page reload and reconnect (P0.2)
-        if (qNum === 5) {
-          await bobPage.reload();
-          // Bob automatically restores session and lands back on player page
-          await expect(bobPage.getByText('Bob').first()).toBeVisible({ timeout: 8000 });
-        }
-
-        const nextQBtn = hostPage.getByRole('button', { name: /próxima pergunta/i });
-        await nextQBtn.click();
+        // Automatically transitions to COUNTDOWN (3s) and then next QUESTION_ACTIVE
+        // The loop will wait for next question's qProgress on top of next iteration!
       } else {
-        // Question 10 (Final Question) -> Transitions to FINAL_RANKING (P0.5)
-        await expect(screenPage.getByText(/classificação final/i)).toBeVisible({ timeout: 8000 });
+        // Question 10: Automatically transitions to FINAL_RANKING (~5s alarm)
+        await expect(screenPage.getByText(/classificação final/i)).toBeVisible({ timeout: 10000 });
       }
     }
 
     // -------------------------------------------------------------
-    // 8. Question 10 -> Podium Ceremony (P2.4)
+    // 7. Question 10 -> Automated Podium Ceremony (~5s alarm)
     // -------------------------------------------------------------
-    // Host triggers podium ceremony from FINAL_RANKING
-    const startPodiumBtn = hostPage.getByRole('button', { name: /iniciar pódio/i });
-    await expect(startPodiumBtn).toBeVisible({ timeout: 8000 });
-    await startPodiumBtn.click();
-
-    // Screen displays ceremonial podium
+    // Automatically transitions from FINAL_RANKING to PODIUM
     await expect(screenPage.getByText(/pódio dos campeões/i)).toBeVisible({ timeout: 10000 });
+
+    // Adaptive podium displays 1º and 2º place for 2 participants (P0.20)
     await expect(screenPage.getByText('1º')).toBeVisible({ timeout: 12000 });
+    await expect(screenPage.getByText('2º')).toBeVisible({ timeout: 12000 });
 
-    // Host finishes game
-    const finishGameBtn = hostPage.getByRole('button', { name: /concluir partida/i });
-    await expect(finishGameBtn).toBeVisible({ timeout: 8000 });
-    await finishGameBtn.click();
+    // -------------------------------------------------------------
+    // 8. Automated Transition to FINISHED (~10s alarm)
+    // -------------------------------------------------------------
+    // Screen displays game completion
+    await expect(screenPage.getByText(/fim de jogo/i)).toBeVisible({ timeout: 15000 });
 
-    // Confirm dialog
-    const confirmBtn = hostPage.getByRole('button', { name: /finalizar agora/i });
-    await expect(confirmBtn).toBeVisible({ timeout: 5000 });
-    await confirmBtn.click();
+    // Host displays FINISHED state with action buttons
+    await expect(hostPage.getByText(/partida encerrada/i)).toBeVisible({ timeout: 15000 });
+    const novaPartidaBtn = hostPage.getByRole('button', { name: /nova partida/i });
+    await expect(novaPartidaBtn).toBeVisible();
 
-    // Screen displays game completed
-    await expect(screenPage.getByText(/fim de jogo/i)).toBeVisible({ timeout: 8000 });
+    // Alice displays FINISHED state with position and score
+    await expect(alicePage.getByText(/partida finalizada/i)).toBeVisible({ timeout: 15000 });
+    const voltarInicioBtn = alicePage.getByRole('button', { name: /voltar ao início/i });
+    await expect(voltarInicioBtn).toBeVisible();
 
-    // Clean up contexts
+    // -------------------------------------------------------------
+    // 9. Clean Navigation & Storage (P0.23, P0.24)
+    // -------------------------------------------------------------
+    // Alice returns home cleanly
+    await voltarInicioBtn.click();
+    await expect(alicePage).toHaveURL('/', { timeout: 5000 });
+
+    // Host navigates to create another game
+    await novaPartidaBtn.click();
+    await expect(hostPage).toHaveURL('/host', { timeout: 5000 });
+
+    // Clean up browser contexts
     await hostContext.close();
     await screenContext.close();
     await aliceContext.close();
     await bobContext.close();
-    await charlieContext.close();
   });
 });

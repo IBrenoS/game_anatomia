@@ -24,7 +24,7 @@ export default function PlayerReveal({ result, correctOptionId, question: propQu
     soundManager.playRevealChime(result?.correct);
   }, [result]);
 
-  if (!result) {
+  if (!result || !result.selectedOptionId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-white p-6 text-center max-w-sm mx-auto select-none">
         <div className="w-20 h-20 bg-amber-600/30 rounded-full flex items-center justify-center mb-4 text-4xl border border-amber-400/40">
@@ -32,7 +32,7 @@ export default function PlayerReveal({ result, correctOptionId, question: propQu
         </div>
         <h2 className="text-3xl font-black mb-2 text-yellow-300">Tempo Esgotado!</h2>
         <p className="text-sm text-blue-200 mb-4">
-          Você não enviou uma resposta a tempo nesta rodada.
+          Sem resposta nesta rodada. Você não enviou uma alternativa a tempo.
         </p>
 
         {correctOption && (
@@ -126,8 +126,9 @@ export default function PlayerReveal({ result, correctOptionId, question: propQu
         </span>
       </div>
       
-      <div className="mt-4 text-xs text-blue-300/80 font-medium">
-        Aguarde o apresentador avançar para a classificação
+      <div className="mt-4 text-xs text-blue-300/80 font-medium flex items-center gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+        <span>Avançando para a classificação em instantes...</span>
       </div>
     </div>
   );

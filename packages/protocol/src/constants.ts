@@ -38,3 +38,9 @@ export const PIN_LENGTH = 6;
 /** PRD FR 005: Nickname min/max length after normalization */
 export const NICKNAME_MIN_LENGTH = 2;
 export const NICKNAME_MAX_LENGTH = 20;
+
+/** PRD v1.1: Automatic game loop phase durations */
+export const REVEAL_DURATION_MS = 5_000;
+export const ROUND_RANKING_DURATION_MS = 5_000;
+export const FINAL_RANKING_DURATION_MS = 5_000;
+export const PODIUM_DURATION_MS = 10_000;
