@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { PublicQuestion } from '@batalha/protocol';
-import { wsManager } from '../../lib/ws.js';
+import { getWebSocketManager } from '../../lib/ws.js';
 import { useGameStore } from '../../stores/gameStore.js';
 import { soundManager } from '../../lib/sound.js';
 import CountdownTimer from './CountdownTimer.js';
@@ -82,7 +82,7 @@ export default function PlayerQuestion({
     soundManager.playAnswerSubmit();
 
     // Transmit authoritative answer
-    wsManager.submitAnswer(question.id, currentQuestionIndex, optionId);
+    getWebSocketManager('player').submitAnswer(question.id, currentQuestionIndex, optionId);
   };
 
   return (

@@ -1,6 +1,6 @@
 import type { RankingEntry } from '@batalha/protocol';
 import { useGameStore } from '../../stores/gameStore.js';
-import { wsManager } from '../../lib/ws.js';
+import { getWebSocketManager } from '../../lib/ws.js';
 
 interface PlayerFinishedProps {
   ranking?: RankingEntry;
@@ -12,7 +12,7 @@ export default function PlayerFinished({ ranking }: PlayerFinishedProps) {
     if (pin) {
       localStorage.removeItem(`batalha_session_${pin}`);
     }
-    wsManager.disconnect();
+    getWebSocketManager('player').disconnect();
     useGameStore.getState().resetStore();
     window.location.href = '/';
   };

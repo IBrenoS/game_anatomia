@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { wsManager } from '../../lib/ws.js';
+import { getWebSocketManager, type ConnectionState } from '../../lib/ws.js';
 import { useGameStore } from '../../stores/gameStore.js';
 import { soundManager } from '../../lib/sound.js';
 import ConfirmDialog from '../shared/ConfirmDialog.js';
 
 interface HostControlsProps {
   roomState: string | null;
+  adminConnectionState: ConnectionState;
 }
 
-export default function HostControls({ roomState }: HostControlsProps) {
+export default function HostControls({ roomState, adminConnectionState }: HostControlsProps) {
   const [confirmAction, setConfirmAction] = useState<'END_QUESTION' | 'END_GAME' | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => soundManager.isEnabled());
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -36,7 +37,9 @@ export default function HostControls({ roomState }: HostControlsProps) {
   };
 
   const handleCommand = (command: string, data?: Record<string, unknown>) => {
-    wsManager.sendHostCommand(command, wsManager.roomVersion, data);
+    if (adminConnectionState !== 'connected') return;
+    const hostManager = getWebSocketManager('host');
+    hostManager.sendHostCommand(command, hostManager.roomVersion, data);
   };
 
   const handleExecuteConfirmedAction = () => {
@@ -192,9 +195,13 @@ export default function HostControls({ roomState }: HostControlsProps) {
       </div>
 
       {/* Ações de controle de estado */}
-      <div className="flex items-center gap-3">
-        {renderStateButtons()}
-      </div>
+      <fieldset disabled={adminConnectionState !== 'connected'} className="flex items-center gap-3 disabled:opacity-60">
+        {adminConnectionState !== 'connected' ? (
+          <span role="status" className="text-sm font-bold text-amber-200">
+            Reconectando controles da partida…
+          </span>
+        ) : renderStateButtons()}
+      </fieldset>
 
       <ConfirmDialog
         isOpen={confirmAction === 'END_QUESTION'}

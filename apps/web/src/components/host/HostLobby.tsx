@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import PlayerList from './PlayerList.js';
 import ConfirmDialog from '../shared/ConfirmDialog.js';
-import { wsManager } from '../../lib/ws.js';
+import { getWebSocketManager } from '../../lib/ws.js';
 import { useGameStore } from '../../stores/gameStore.js';
 
 interface HostLobbyProps {
@@ -51,7 +51,8 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
 
   const handleToggleLock = () => {
     const command = entryLocked ? 'UNLOCK_ENTRIES' : 'LOCK_ENTRIES';
-    wsManager.sendHostCommand(command, wsManager.roomVersion);
+    const hostManager = getWebSocketManager('host');
+    hostManager.sendHostCommand(command, hostManager.roomVersion);
   };
 
   const totalPlayers = useGameStore(s => s.totalPlayers);
@@ -60,12 +61,14 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
 
   const handleStartGame = () => {
     if (!canStart) return;
-    wsManager.sendHostCommand('START_GAME', wsManager.roomVersion);
+    const hostManager = getWebSocketManager('host');
+    hostManager.sendHostCommand('START_GAME', hostManager.roomVersion);
   };
 
   const handleConfirmRemove = () => {
     if (!playerToRemove) return;
-    wsManager.sendHostCommand('REMOVE_PLAYER', wsManager.roomVersion, { playerId: playerToRemove.id });
+    const hostManager = getWebSocketManager('host');
+    hostManager.sendHostCommand('REMOVE_PLAYER', hostManager.roomVersion, { playerId: playerToRemove.id });
     setPlayerToRemove(null);
   };
 

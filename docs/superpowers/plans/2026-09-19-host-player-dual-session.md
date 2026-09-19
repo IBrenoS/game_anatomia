@@ -375,7 +375,7 @@ git commit -m "feat: adicionar escolha host ou host player"
 - Consumes: `useGameSocket('host', { syncStore })` e `useGameSocket('player')` da Task 2.
 - Produces: `HostControlsProps.adminConnectionState: ConnectionState`
 
-- [ ] **Step 1: Escrever E2E mínimo falhando para justiça e dual connection**
+- [x] **Step 1: Escrever E2E mínimo falhando para justiça e dual connection**
 
 Criar inicialmente `tests/e2e/host-player.spec.ts` com T2–T5:
 
@@ -400,13 +400,13 @@ test('T2-T5: criador entra uma vez, mantém dois sockets e recebe superfície Pl
 
 Declarar o tipo de debug apenas no teste ou em `vite-env.d.ts`, sem `any` em código de produto.
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `pnpm playwright test tests/e2e/host-player.spec.ts --project=chromium --grep "T2-T5"`
 
 Expected: FAIL porque a página Host ainda renderiza `HostQuestion` e não mantém os dois managers.
 
-- [ ] **Step 3: Implementar composição da página**
+- [x] **Step 3: Implementar composição da página**
 
 Em `HostPage`:
 
@@ -423,7 +423,7 @@ No renderer combinado, usar `PlayerCountdown`, `PlayerQuestion`, `PlayerReveal`,
 
 Passar `adminConnectionState` para `HostControls`; quando diferente de `connected`, desabilitar comandos e exibir “Reconectando controles da partida…”, sem cobrir ou desabilitar a superfície Player.
 
-- [ ] **Step 4: Executar GREEN e testes direcionados**
+- [x] **Step 4: Executar GREEN e testes direcionados**
 
 Run: `pnpm playwright test tests/e2e/host-player.spec.ts --project=chromium --grep "T2-T5"`
 
@@ -433,7 +433,7 @@ Run: `pnpm vitest run apps/web/src/lib/ws.test.ts apps/web/src/lib/socketBinding
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add apps/web/src/pages/HostPage.tsx apps/web/src/components/host/HostLobby.tsx apps/web/src/components/host/HostControls.tsx apps/web/src/components/player/PlayerQuestion.tsx apps/web/src/components/player/PlayerFinished.tsx tests/e2e/host-player.spec.ts

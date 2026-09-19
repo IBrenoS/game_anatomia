@@ -395,10 +395,3 @@ export function getWebSocketManager(role: GameSocketRole): WebSocketManager {
 export function disconnectWebSocketManager(role: GameSocketRole): void {
   managers.get(role)?.disconnect();
 }
-
-// Compatibility alias while existing consumers migrate to role-specific managers.
-export const wsManager = getWebSocketManager('player');
-
-if (typeof window !== 'undefined') {
-  (window as typeof window & { __wsManager?: WebSocketManager }).__wsManager = wsManager;
-}
