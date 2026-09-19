@@ -2,30 +2,59 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { createRoom } from '../lib/api.js';
 import { useGameStore } from '../stores/gameStore.js';
+import {
+  joinCreatedRoomAsPlayer,
+  PlayerJoinError,
+  setHostParticipation,
+  type HostParticipationMode,
+} from '../lib/hostParticipation.js';
+import { getWebSocketManager } from '../lib/ws.js';
 
 export const HostEntryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [creationStatus, setCreationStatus] = useState<'idle' | 'creating' | 'error'>('idle');
+  const [mode, setMode] = useState<HostParticipationMode | null>(null);
+  const [nickname, setNickname] = useState('');
+  const [creationStatus, setCreationStatus] = useState<'selecting' | 'creating-room' | 'joining-player' | 'error'>('selecting');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [createdRoom, setCreatedRoom] = useState<{ pin: string; joinUrl: string } | null>(null);
 
   const handleStartBattle = async () => {
-    if (creationStatus === 'creating') return;
+    if (creationStatus === 'creating-room' || creationStatus === 'joining-player') return;
+    if (!mode) {
+      setErrorMessage('Escolha como você vai participar.');
+      return;
+    }
 
-    setCreationStatus('creating');
+    const normalizedNickname = nickname.trim().replace(/\s+/g, ' ');
+    if (mode === 'player' && (normalizedNickname.length < 2 || normalizedNickname.length > 20)) {
+      setErrorMessage('O apelido deve ter entre 2 e 20 caracteres.');
+      return;
+    }
+
     setErrorMessage(null);
 
     try {
-      const { pin, joinUrl } = await createRoom();
-      
-      useGameStore.getState().setHostData({ joinUrl, pin });
+      setCreationStatus(createdRoom ? 'joining-player' : 'creating-room');
+      const room = createdRoom ?? await createRoom();
+      if (!createdRoom) setCreatedRoom(room);
 
-      // Navigate to host management room
-      navigate(`/host/${pin}`);
+      useGameStore.getState().setHostData(room);
+
+      if (mode === 'player') {
+        setCreationStatus('joining-player');
+        await joinCreatedRoomAsPlayer(room.pin, normalizedNickname, getWebSocketManager('player'));
+      }
+
+      setHostParticipation(room.pin, mode);
+
+      navigate(`/host/${room.pin}`);
     } catch (err) {
       console.error('Falha ao iniciar batalha:', err);
       setCreationStatus('error');
       setErrorMessage(
-        err instanceof Error && err.message
+        err instanceof PlayerJoinError
+          ? err.message
+          : err instanceof Error && err.message
           ? err.message
           : 'Não foi possível conectar ao servidor para criar a arena. Verifique sua conexão e tente novamente.'
       );
@@ -118,21 +147,72 @@ export const HostEntryPage: React.FC = () => {
             </div>
           )}
 
+          <fieldset className="w-full space-y-3">
+            <legend className="text-base font-bold text-white mb-3 text-center">
+              Como você vai participar?
+            </legend>
+            <button
+              type="button"
+              onClick={() => { setMode('player'); setErrorMessage(null); }}
+              aria-pressed={mode === 'player'}
+              className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                mode === 'player'
+                  ? 'border-emerald-400 bg-emerald-500/20 ring-2 ring-emerald-400/30'
+                  : 'border-white/15 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <span className="block font-black text-white">Também vou jogar</span>
+              <span className="block text-sm text-blue-200 mt-1">Você cria a sala e participa da batalha.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('presenter'); setErrorMessage(null); }}
+              aria-pressed={mode === 'presenter'}
+              className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                mode === 'presenter'
+                  ? 'border-blue-400 bg-blue-500/20 ring-2 ring-blue-400/30'
+                  : 'border-white/15 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <span className="block font-black text-white">Só vou apresentar</span>
+              <span className="block text-sm text-blue-200 mt-1">Você controla a partida sem participar.</span>
+            </button>
+          </fieldset>
+
+          {mode === 'player' && (
+            <div className="w-full space-y-2">
+              <label htmlFor="host-player-nickname" className="block text-sm font-bold text-blue-100">
+                Nome ou apelido
+              </label>
+              <input
+                id="host-player-nickname"
+                type="text"
+                value={nickname}
+                onChange={(event) => { setNickname(event.target.value); setErrorMessage(null); }}
+                minLength={2}
+                maxLength={20}
+                autoComplete="off"
+                className="w-full rounded-xl bg-white p-3 text-lg font-bold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-400/50"
+                placeholder="Ex: Breno"
+              />
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleStartBattle}
-            disabled={creationStatus === 'creating'}
+            disabled={creationStatus === 'creating-room' || creationStatus === 'joining-player'}
             className="w-full min-h-[56px] py-4 px-6 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:from-slate-700 disabled:to-slate-800 disabled:opacity-75 text-white text-xl font-black rounded-2xl shadow-xl shadow-green-950/40 transition-all active:scale-95 cursor-pointer disabled:cursor-wait flex items-center justify-center gap-3"
           >
-            {creationStatus === 'creating' ? (
+            {creationStatus === 'creating-room' || creationStatus === 'joining-player' ? (
               <>
                 <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin motion-reduce:animate-none" />
-                <span>Preparando a arena...</span>
+                <span>{creationStatus === 'joining-player' ? 'Entrando na arena...' : 'Preparando a arena...'}</span>
               </>
             ) : (
               <>
                 <span>▶</span>
-                <span>Iniciar Batalha</span>
+                <span>{createdRoom ? 'Tentar entrar novamente' : 'Criar partida'}</span>
               </>
             )}
           </button>

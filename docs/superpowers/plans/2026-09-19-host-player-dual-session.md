@@ -281,7 +281,7 @@ git commit -m "refactor: isolar sincronizacao websocket por papel"
 - Produces: `setHostParticipation(pin: string, mode: HostParticipationMode): void`
 - Produces: `joinCreatedRoomAsPlayer(pin: string, nickname: string, manager: WebSocketManager): Promise<void>`
 
-- [ ] **Step 1: Escrever testes falhando para persistência, sucesso e erro**
+- [x] **Step 1: Escrever testes falhando para persistência, sucesso e erro**
 
 ```ts
 it('T1: PIN sem escolha explícita permanece presenter mesmo com token player', () => {
@@ -320,13 +320,13 @@ it('mantém a mesma sala disponível para retry após erro protocolar', async ()
 });
 ```
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `pnpm vitest run apps/web/src/lib/hostParticipation.test.ts`
 
 Expected: FAIL porque o módulo não existe.
 
-- [ ] **Step 3: Implementar serviço e formulário**
+- [x] **Step 3: Implementar serviço e formulário**
 
 Usar chave `batalha_host_participation_${pin}` e default seguro `presenter`. O ingresso deve registrar listeners antes de conectar, limpar todos em resolve/reject e nunca chamar `JOIN_ROOM` duas vezes para a mesma abertura.
 
@@ -344,7 +344,7 @@ Em `HostEntryPage`, representar os estados `selecting`, `creating-room`, `joinin
 
 Para `player`, validar o apelido normalizado com 2–20 caracteres, criar uma única sala, salvar `player`, aguardar `joinCreatedRoomAsPlayer` e só então navegar. Para `presenter`, salvar `presenter` e navegar imediatamente após `createRoom`.
 
-- [ ] **Step 4: Executar GREEN**
+- [x] **Step 4: Executar GREEN**
 
 Run: `pnpm vitest run apps/web/src/lib/hostParticipation.test.ts apps/web/src/lib/ws.test.ts`
 
@@ -354,7 +354,7 @@ Run: `pnpm typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add apps/web/src/lib/hostParticipation.ts apps/web/src/lib/hostParticipation.test.ts apps/web/src/pages/HostEntryPage.tsx
