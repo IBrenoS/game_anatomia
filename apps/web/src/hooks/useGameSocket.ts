@@ -1,101 +1,43 @@
-import { useEffect, useCallback, useRef } from 'react';
-import { wsManager } from '../lib/ws.js';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  getWebSocketManager,
+  type ConnectionState,
+  type GameSocketRole,
+} from '../lib/ws.js';
+import { bindGameSocketToStore } from '../lib/socketBindings.js';
 import { useGameStore } from '../stores/gameStore.js';
-import { ServerEventType } from '@batalha/protocol';
 
-/**
- * React hook that wires the WebSocket manager to the Zustand store.
- * Registers all server event handlers on mount, cleans up on unmount.
- * Returns { connect, disconnect, connectionState }.
- */
-export function useGameSocket() {
-  const store = useGameStore();
-  const initialized = useRef(false);
+interface UseGameSocketOptions {
+  syncStore?: boolean;
+}
+
+export function useGameSocket(
+  role: GameSocketRole,
+  options: UseGameSocketOptions = {},
+) {
+  const manager = getWebSocketManager(role);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(manager.state);
+  const syncStore = options.syncStore ?? true;
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
-    // Sync current manager state immediately on mount
-    useGameStore.getState().setConnectionState(wsManager.state);
-
-    // Register state change listener
-    const unsubscribeState = wsManager.onStateChange((state) => {
-      useGameStore.getState().setConnectionState(state);
-    });
-
-    // Register all server event handlers
-    const unsubscribes = [
-      // Session accepted — save identity and reconnect token
-      wsManager.onEvent(ServerEventType.SESSION_ACCEPTED, (payload) => {
-        useGameStore.getState().setSession({
-          playerId: payload.playerId,
-          reconnectToken: payload.reconnectToken,
-          nickname: payload.nickname,
-        });
-      }),
-      wsManager.onEvent(ServerEventType.SNAPSHOT, (payload) => {
-        useGameStore.getState().handleSnapshot(payload);
-      }),
-      wsManager.onEvent(ServerEventType.PLAYER_JOINED, (payload) => {
-        useGameStore.getState().handlePlayerJoined(payload);
-      }),
-      wsManager.onEvent(ServerEventType.PLAYER_PRESENCE_CHANGED, (payload) => {
-        useGameStore.getState().handlePlayerPresenceChanged(payload);
-      }),
-      wsManager.onEvent(ServerEventType.GAME_STATE_CHANGED, (payload) => {
-        useGameStore.getState().handleGameStateChanged(payload);
-      }),
-      wsManager.onEvent(ServerEventType.QUESTION_STARTED, (payload) => {
-        useGameStore.getState().handleQuestionStarted(payload);
-      }),
-      wsManager.onEvent(ServerEventType.ROUND_PROGRESS, (payload) => {
-        useGameStore.getState().handleRoundProgress(payload);
-      }),
-      wsManager.onEvent(ServerEventType.ANSWER_ACCEPTED, (payload) => {
-        useGameStore.getState().handleAnswerAccepted(payload);
-      }),
-      wsManager.onEvent(ServerEventType.ANSWER_REJECTED, (payload) => {
-        useGameStore.getState().handleAnswerRejected(payload);
-      }),
-      wsManager.onEvent(ServerEventType.QUESTION_ENDED, (payload) => {
-        useGameStore.getState().handleQuestionEnded(payload);
-      }),
-      wsManager.onEvent(ServerEventType.ANSWER_REVEAL, (payload) => {
-        useGameStore.getState().handleAnswerReveal(payload);
-      }),
-      wsManager.onEvent(ServerEventType.RANKING_UPDATED, (payload) => {
-        useGameStore.getState().handleRankingUpdated(payload);
-      }),
-      wsManager.onEvent(ServerEventType.ROOM_FINISHED, (payload) => {
-        useGameStore.getState().handleRoomFinished(payload);
-      }),
-      // Error events
-      wsManager.onEvent(ServerEventType.ERROR, (payload) => {
-        console.error('[WS Error]', payload.code, payload.message);
-      }),
-      unsubscribeState,
-    ];
+    setConnectionState(manager.state);
+    const unsubscribeState = manager.onStateChange(setConnectionState);
+    const unsubscribeStore = syncStore ? bindGameSocketToStore(manager) : () => undefined;
 
     return () => {
-      unsubscribes.forEach(unsub => unsub());
-      initialized.current = false;
+      unsubscribeState();
+      unsubscribeStore();
     };
-  }, []);
+  }, [manager, syncStore]);
 
-  const connect = useCallback((pin: string, role: string, token?: string) => {
+  const connect = useCallback((pin: string, token?: string) => {
     useGameStore.getState().setPin(pin);
-    useGameStore.getState().setRole(role as 'player' | 'host' | 'screen');
-    wsManager.connect(pin, role, token);
-  }, []);
+    manager.connect(pin, role, token);
+  }, [manager, role]);
 
   const disconnect = useCallback(() => {
-    wsManager.disconnect();
-  }, []);
+    manager.disconnect();
+  }, [manager]);
 
-  return {
-    connect,
-    disconnect,
-    connectionState: store.connectionState,
-  };
+  return { manager, connect, disconnect, connectionState };
 }

@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router';
 import { checkRoom } from '../lib/api.js';
 import { useGameSocket } from '../hooks/useGameSocket.js';
 import { useGameStore } from '../stores/gameStore.js';
-import { wsManager } from '../lib/ws.js';
 import { ServerEventType, ProtocolError } from '@batalha/protocol';
 
 export function JoinPage() {
@@ -15,9 +14,8 @@ export function JoinPage() {
   const [isValidRoom, setIsValidRoom] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
-  const { connect } = useGameSocket();
+  const { manager, connect, connectionState } = useGameSocket('player');
   const playerId = useGameStore(s => s.playerId);
-  const connectionState = useGameStore(s => s.connectionState);
 
   // Check room existence on mount
   useEffect(() => {
@@ -41,11 +39,10 @@ export function JoinPage() {
           const savedToken = localStorage.getItem(`batalha_session_${pin}`);
           if (savedToken) {
             setIsJoining(true);
-            connect(pin, 'player');
+            connect(pin, savedToken);
             // Once connected, send RESUME_SESSION
-            const unsub = wsManager.onStateChange((state) => {
+            const unsub = manager.onStateChange((state) => {
               if (state === 'connected') {
-                wsManager.resumeSession(pin, savedToken);
                 unsub();
               }
             });
@@ -58,18 +55,18 @@ export function JoinPage() {
         setIsChecking(false);
       }
     })();
-  }, [pin]);
+  }, [connect, manager, navigate, pin]);
 
   // Navigate to play page when session is established
   useEffect(() => {
-    if (playerId && (connectionState === 'connected' || wsManager.state === 'connected')) {
+    if (playerId && (connectionState === 'connected' || manager.state === 'connected')) {
       navigate(`/play/${pin}`, { replace: true });
     }
-  }, [playerId, connectionState, navigate, pin]);
+  }, [playerId, connectionState, manager, navigate, pin]);
 
   // Listen for errors from server
   useEffect(() => {
-    const unsub = wsManager.onEvent(ServerEventType.ERROR, (payload) => {
+    const unsub = manager.onEvent(ServerEventType.ERROR, (payload) => {
       setIsJoining(false);
       const msg = payload.message || 'Erro ao entrar na sala.';
       if (payload.code === ProtocolError.NICKNAME_TAKEN) {
@@ -83,7 +80,7 @@ export function JoinPage() {
       }
     });
     return unsub;
-  }, []);
+  }, [manager]);
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,13 +96,13 @@ export function JoinPage() {
     setIsJoining(true);
 
     // Connect WebSocket, then send JOIN_ROOM once connected
-    if (wsManager.state === 'connected') {
-      wsManager.joinRoom(pin, trimmed);
+    if (manager.state === 'connected') {
+      manager.joinRoom(pin, trimmed);
     } else {
-      connect(pin, 'player');
-      const unsub = wsManager.onStateChange((state) => {
+      connect(pin);
+      const unsub = manager.onStateChange((state) => {
         if (state === 'connected') {
-          wsManager.joinRoom(pin, trimmed);
+          manager.joinRoom(pin, trimmed);
           unsub();
         }
       });

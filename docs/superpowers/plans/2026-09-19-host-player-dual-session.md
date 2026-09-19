@@ -163,7 +163,7 @@ git commit -m "feat: suportar conexoes websocket por papel"
 - Produces: `bindGameSocketToStore(manager: WebSocketManager): () => void`
 - Produces: `useGameSocket(role: GameSocketRole, options?: { syncStore?: boolean }): { manager: WebSocketManager; connect(pin: string, token?: string): void; disconnect(): void; connectionState: ConnectionState }`
 
-- [ ] **Step 1: Escrever testes falhando para binding opt-in e identidade Player**
+- [x] **Step 1: Escrever testes falhando para binding opt-in e identidade Player**
 
 Em `socketBindings.test.ts`, usar managers reais com `installFakeWebSocket`, disparando envelopes por `emit`:
 
@@ -197,13 +197,13 @@ it('T5: snapshot host não alimenta store quando não possui binding', () => {
 
 Adicionar teste em `gameStore.test.ts` garantindo que `SESSION_ACCEPTED` Player preserva `playerId`, nickname e token após snapshots subsequentes.
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `pnpm vitest run apps/web/src/lib/socketBindings.test.ts apps/web/src/stores/gameStore.test.ts`
 
 Expected: FAIL porque o binding extraído ainda não existe.
 
-- [ ] **Step 3: Extrair binding e parametrizar hook**
+- [x] **Step 3: Extrair binding e parametrizar hook**
 
 Mover a lista atual de `onEvent` para `socketBindings.ts`, retornando cleanup único:
 
@@ -250,7 +250,7 @@ export function useGameSocket(
 
 Remover `connectionState`, `role`, `setConnectionState` e `setRole` do store depois de migrar consumidores. Atualizar `JoinPage`, `PlayerPage` e `ScreenPage` para `useGameSocket('player')` ou `useGameSocket('screen')` e usar o `manager` retornado.
 
-- [ ] **Step 4: Executar GREEN e typecheck direcionado**
+- [x] **Step 4: Executar GREEN e typecheck direcionado**
 
 Run: `pnpm vitest run apps/web/src/lib/socketBindings.test.ts apps/web/src/stores/gameStore.test.ts apps/web/src/lib/ws.test.ts`
 
@@ -260,7 +260,7 @@ Run: `pnpm typecheck`
 
 Expected: PASS, provando que não restaram consumidores do singleton/estado global removidos.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add apps/web/src/lib/socketBindings.ts apps/web/src/lib/socketBindings.test.ts apps/web/src/hooks/useGameSocket.ts apps/web/src/stores/gameStore.ts apps/web/src/stores/gameStore.test.ts apps/web/src/pages/JoinPage.tsx apps/web/src/pages/PlayerPage.tsx apps/web/src/pages/ScreenPage.tsx

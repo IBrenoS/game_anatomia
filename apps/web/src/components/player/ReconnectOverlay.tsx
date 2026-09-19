@@ -1,12 +1,9 @@
-import { useGameStore } from '../../stores/gameStore.js';
-
 interface ReconnectOverlayProps {
   isReconnecting?: boolean;
 }
 
 export default function ReconnectOverlay({ isReconnecting }: ReconnectOverlayProps) {
-  const storeState = useGameStore(s => s.connectionState);
-  const active = isReconnecting !== undefined ? isReconnecting : storeState === 'reconnecting';
+  const active = isReconnecting ?? false;
 
   if (!active) return null;
 

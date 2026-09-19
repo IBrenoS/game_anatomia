@@ -13,7 +13,7 @@ export function ScreenPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
   const [searchParams] = useSearchParams();
   const pin = routePin || searchParams.get('pin') || '';
-  const { connect, connectionState } = useGameSocket();
+  const { connect, connectionState } = useGameSocket('screen');
 
   const roomState = useGameStore((s) => s.roomState);
   const players = useGameStore((s) => s.players);
@@ -31,7 +31,7 @@ export function ScreenPage() {
 
   useEffect(() => {
     if (pin) {
-      connect(pin, 'screen');
+      connect(pin);
     }
   }, [pin, connect]);
 

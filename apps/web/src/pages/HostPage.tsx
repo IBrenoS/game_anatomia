@@ -15,7 +15,7 @@ export function HostPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
   const navigate = useNavigate();
   const pin = routePin || '';
-  const { connect, connectionState } = useGameSocket();
+  const { connect, connectionState } = useGameSocket('host');
 
   const roomState = useGameStore((s) => s.roomState);
   const players = useGameStore((s) => s.players);
@@ -36,7 +36,7 @@ export function HostPage() {
 
   useEffect(() => {
     if (pin) {
-      connect(pin, 'host');
+      connect(pin);
     }
   }, [pin, connect]);
 

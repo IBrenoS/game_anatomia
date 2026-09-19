@@ -10,12 +10,11 @@ import PlayerRanking from '../components/player/PlayerRanking.js';
 import PlayerPodium from '../components/player/PlayerPodium.js';
 import PlayerFinished from '../components/player/PlayerFinished.js';
 import ReconnectOverlay from '../components/player/ReconnectOverlay.js';
-import { wsManager } from '../lib/ws.js';
 
 export function PlayerPage() {
   const { pin } = useParams<{ pin: string }>();
   const navigate = useNavigate();
-  const { connect, connectionState } = useGameSocket();
+  const { manager, connect, connectionState } = useGameSocket('player');
 
   const roomState = useGameStore((s) => s.roomState);
   const remainingMs = useGameStore((s) => s.remainingMs);
@@ -42,17 +41,17 @@ export function PlayerPage() {
       return;
     }
 
-    if (connectionState === 'disconnected' && wsManager.state === 'disconnected') {
+    if (connectionState === 'disconnected' && manager.state === 'disconnected') {
       const savedToken = localStorage.getItem(`batalha_session_${pin}`);
       if (savedToken) {
-        connect(pin, 'player', savedToken);
+        connect(pin, savedToken);
       } else if (!playerId) {
         navigate(`/join/${pin}`, { replace: true });
       }
     }
-  }, [pin, connectionState, playerId, connect, navigate]);
+  }, [pin, connectionState, playerId, connect, manager, navigate]);
 
-  const isConnected = connectionState === 'connected' || wsManager.state === 'connected';
+  const isConnected = connectionState === 'connected' || manager.state === 'connected';
   if (!isConnected && (connectionState === 'disconnected' || connectionState === 'connecting')) {
     return (
       <div className="min-h-screen bg-[#1e3a5f] text-white flex items-center justify-center p-4 text-center">

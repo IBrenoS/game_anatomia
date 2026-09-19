@@ -23,9 +23,6 @@ export interface PersonalScore {
 }
 
 interface GameStoreState {
-  // Connection
-  connectionState: 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
-  
   // Room
   pin: string | null;
   roomState: GameState | null;
@@ -34,7 +31,6 @@ interface GameStoreState {
   currentQuestionIndex: number;
   
   // Player identity
-  role: 'player' | 'host' | 'screen' | null;
   playerId: string | null;
   nickname: string | null;
   reconnectToken: string | null;
@@ -90,9 +86,7 @@ interface GameStoreState {
   answerRejected: { code: string; message: string } | null;
   
   // Actions
-  setConnectionState: (state: GameStoreState['connectionState']) => void;
   setPin: (pin: string) => void;
-  setRole: (role: GameStoreState['role']) => void;
   setHostData: (data: { joinUrl: string; pin: string }) => void;
   setSession: (data: { playerId: string; reconnectToken?: string; nickname: string }) => void;
   
@@ -117,13 +111,11 @@ interface GameStoreState {
 }
 
 const initialState = {
-  connectionState: 'disconnected' as const,
   pin: null,
   roomState: null,
   roomVersion: 0,
   entryLocked: false,
   currentQuestionIndex: 0,
-  role: null,
   playerId: null,
   nickname: null,
   reconnectToken: null,
@@ -164,9 +156,7 @@ const initialState = {
 export const useGameStore = create<GameStoreState>((set, get) => ({
   ...initialState,
 
-  setConnectionState: (state) => set({ connectionState: state }),
   setPin: (pin) => set({ pin }),
-  setRole: (role) => set({ role }),
   setHostData: (data) => set({ 
     joinUrl: data.joinUrl, 
     pin: data.pin 
