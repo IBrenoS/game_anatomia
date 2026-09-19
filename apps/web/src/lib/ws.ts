@@ -57,7 +57,11 @@ export class WebSocketManager {
 
   connect(pin: string, role: string, token?: string): void {
     if (this.ws) {
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+      if (
+        this.currentPin === pin &&
+        this.currentRole === role &&
+        (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+      ) {
         return;
       }
       try {
@@ -70,11 +74,25 @@ export class WebSocketManager {
         // ignore
       }
       this.ws = null;
+      this.stopHeartbeat();
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.seenEventIds.clear();
+      this._roomVersion = 0;
+    }
+
+    const isDifferentPin = this.currentPin !== null && this.currentPin !== pin;
+    if (isDifferentPin) {
+      this.currentToken = undefined;
+      this.seenEventIds.clear();
+      this._roomVersion = 0;
     }
 
     this.currentPin = pin;
     this.currentRole = role;
-    this.currentToken = token ?? this.currentToken ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${pin}`) || undefined : undefined);
+    this.currentToken = token ?? (isDifferentPin ? undefined : this.currentToken) ?? (typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${pin}`) || undefined : undefined);
 
     this.setState(this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting');
 
@@ -242,7 +260,15 @@ export class WebSocketManager {
       this.reconnectTimer = null;
     }
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.onopen = null;
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.onmessage = null;
+        this.ws.close();
+      } catch {
+        // ignore
+      }
       this.ws = null;
     }
     this.seenEventIds.clear();

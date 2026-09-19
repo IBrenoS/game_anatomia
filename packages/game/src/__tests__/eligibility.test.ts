@@ -204,5 +204,34 @@ describe('canStartGame', () => {
     expect(canStartGame([{ removedAt: null }])).toBe(true);
     expect(canStartGame([{ removedAt: 12345 }, { removedAt: null }])).toBe(true);
   });
+
+  it('returns false if registered players are all disconnected or presence expired', () => {
+    const now = 100_000;
+    const players = [{ playerId: 'p1', removedAt: null }];
+    // Disconnected
+    expect(canStartGame(players, [{ playerId: 'p1', connected: false, lastSeenAt: now }], now)).toBe(false);
+    // Expired presence (> 10s)
+    expect(canStartGame(players, [{ playerId: 'p1', connected: true, lastSeenAt: now - 15_000 }], now)).toBe(false);
+  });
+
+  it('returns true if at least 1 player has live connected presence', () => {
+    const now = 100_000;
+    const players = [
+      { playerId: 'p1', removedAt: null },
+      { playerId: 'p2', removedAt: null },
+    ];
+    const presences = [
+      { playerId: 'p1', connected: false, lastSeenAt: now },
+      { playerId: 'p2', connected: true, lastSeenAt: now - 2_000 },
+    ];
+    expect(canStartGame(players, presences, now)).toBe(true);
+  });
+
+  it('does not count removed players as connected', () => {
+    const now = 100_000;
+    const players = [{ playerId: 'p1', removedAt: now }];
+    const presences = [{ playerId: 'p1', connected: true, lastSeenAt: now }];
+    expect(canStartGame(players, presences, now)).toBe(false);
+  });
 });
 

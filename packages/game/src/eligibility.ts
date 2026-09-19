@@ -89,10 +89,27 @@ export function shouldQuestionEnd(
 }
 
 /**
- * PRD v1.1 / FR 011: Game can only start if there is at least 1 non-removed player in the room
+ * PRD v1.2 / Section 9: Game can only start if there is at least 1 connected player in the room (connectedPlayers >= 1)
  */
-export function canStartGame(players: Array<{ removedAt?: number | null }>): boolean {
-  return players.some(p => p.removedAt === null || p.removedAt === undefined);
+export function canStartGame(
+  players: Array<{ removedAt?: number | null; playerId?: string }>,
+  presences?: Array<{ playerId: string; connected: boolean; lastSeenAt?: number }>,
+  now: number = Date.now()
+): boolean {
+  if (!players || players.length === 0) return false;
+  if (!presences) {
+    return players.some(p => p.removedAt === null || p.removedAt === undefined);
+  }
+  const nonRemoved = players.filter(p => p.removedAt === null || p.removedAt === undefined);
+  const connectedPlayers = nonRemoved.filter(p => {
+    const pr = presences.find(pres => pres.playerId === p.playerId);
+    if (!pr) return false;
+    if (pr.lastSeenAt !== undefined) {
+      return pr.connected && (now - pr.lastSeenAt) <= PRESENCE_TIMEOUT_MS;
+    }
+    return pr.connected;
+  }).length;
+  return connectedPlayers >= 1;
 }
 
 /**

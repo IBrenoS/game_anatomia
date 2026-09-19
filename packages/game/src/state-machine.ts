@@ -6,16 +6,13 @@ export const VALID_TRANSITIONS: Transition[] = [
   { from: 'LOBBY', to: 'COUNTDOWN', trigger: 'host starts' },
   { from: 'LOBBY', to: 'FINISHED', trigger: 'host ends' },
   { from: 'COUNTDOWN', to: 'QUESTION_ACTIVE', trigger: 'countdown ends' },
-  { from: 'COUNTDOWN', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'QUESTION_ACTIVE', to: 'QUESTION_REVEAL', trigger: 'all answered / deadline / host ends' },
   { from: 'QUESTION_ACTIVE', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'QUESTION_REVEAL', to: 'ROUND_RANKING', trigger: 'timer / host shows ranking' },
   { from: 'QUESTION_REVEAL', to: 'FINAL_RANKING', trigger: 'timer / host shows ranking (last question)' },
-  { from: 'QUESTION_REVEAL', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'QUESTION_REVEAL', to: 'FINISHED', trigger: 'host ends' },
   { from: 'ROUND_RANKING', to: 'COUNTDOWN', trigger: 'timer / host next question, NOT last' },
   { from: 'ROUND_RANKING', to: 'FINAL_RANKING', trigger: 'was last question' },
-  { from: 'ROUND_RANKING', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'ROUND_RANKING', to: 'FINISHED', trigger: 'host ends' },
   { from: 'PAUSED', to: 'COUNTDOWN', trigger: 'host resumes' },
   { from: 'PAUSED', to: 'FINISHED', trigger: 'host ends' },
@@ -23,6 +20,20 @@ export const VALID_TRANSITIONS: Transition[] = [
   { from: 'FINAL_RANKING', to: 'FINISHED', trigger: 'host ends' },
   { from: 'PODIUM', to: 'FINISHED', trigger: 'ceremony ends' }
 ];
+
+/**
+ * PRD v1.2 / Anti-Spoiler: Correct answer can ONLY be revealed in authorized post-round states.
+ * Under NO circumstances can it be revealed during QUESTION_ACTIVE, PAUSED, or COUNTDOWN.
+ */
+export function canRevealAnswer(state: GameState): boolean {
+  return (
+    state === 'QUESTION_REVEAL' ||
+    state === 'ROUND_RANKING' ||
+    state === 'FINAL_RANKING' ||
+    state === 'PODIUM' ||
+    state === 'FINISHED'
+  );
+}
 
 export function getValidTransitions(from: GameState): GameState[] {
   return VALID_TRANSITIONS.filter(t => t.from === from).map(t => t.to);

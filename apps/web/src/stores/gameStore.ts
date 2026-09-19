@@ -325,20 +325,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         joinedAt: Date.now(),
         eligibleFromQuestion: 0,
       }],
-      presences: [...state.presences, { playerId: payload.playerId, connected: true }],
+      presences: [
+        ...state.presences.filter(p => p.playerId !== payload.playerId),
+        { playerId: payload.playerId, connected: true },
+      ],
     };
   }),
 
-  handlePlayerPresenceChanged: (payload) => set((state) => ({
-    players: payload.reason === 'removed'
-      ? state.players.filter(p => p.playerId !== payload.playerId)
-      : state.players,
-    presences: payload.reason === 'removed'
-      ? state.presences.filter(p => p.playerId !== payload.playerId)
-      : state.presences.map(p =>
-          p.playerId === payload.playerId ? { ...p, connected: payload.connected } : p
-        ),
-  })),
+  handlePlayerPresenceChanged: (payload) => set((state) => {
+    if (payload.reason === 'removed') {
+      return {
+        players: state.players.filter(p => p.playerId !== payload.playerId),
+        presences: state.presences.filter(p => p.playerId !== payload.playerId),
+      };
+    }
+    const exists = state.presences.some(p => p.playerId === payload.playerId);
+    const presences = exists
+      ? state.presences.map(p => p.playerId === payload.playerId ? { ...p, connected: payload.connected } : p)
+      : [...state.presences, { playerId: payload.playerId, connected: payload.connected }];
+    return { presences };
+  }),
 
   handleGameStateChanged: (payload) => set((state) => {
     const isCountdown = payload.state === 'COUNTDOWN';

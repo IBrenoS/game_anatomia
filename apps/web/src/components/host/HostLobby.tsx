@@ -54,8 +54,15 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
     wsManager.sendHostCommand(command, wsManager.roomVersion);
   };
 
+  const totalPlayers = players.length;
+  const connectedPlayers = players.filter(p => {
+    const pr = presences.find(pres => pres.playerId === p.playerId);
+    return pr ? pr.connected : false;
+  }).length;
+  const canStart = connectedPlayers >= 1;
+
   const handleStartGame = () => {
-    if (players.length === 0) return;
+    if (!canStart) return;
     wsManager.sendHostCommand('START_GAME', wsManager.roomVersion);
   };
 
@@ -64,8 +71,6 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
     wsManager.sendHostCommand('REMOVE_PLAYER', wsManager.roomVersion, { playerId: playerToRemove.id });
     setPlayerToRemove(null);
   };
-
-  const canStart = players.length > 0;
 
   return (
     <div className="flex flex-col h-full text-white max-w-5xl mx-auto w-full">
@@ -153,12 +158,12 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
           <div className={`w-3.5 h-3.5 rounded-full ${canStart ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
           <div>
             <h3 className="text-base font-bold text-white">
-              {canStart ? `Arena pronta: ${players.length} participante(s)` : 'Aguardando participantes...'}
+              {canStart ? `Arena pronta: ${totalPlayers} participante(s) (${connectedPlayers} conectado(s))` : 'Aguardando participantes...'}
             </h3>
             <p className="text-xs text-blue-300">
               {canStart
                 ? 'Você já pode dar início à rodada da batalha quando desejar.'
-                : 'Pelo menos 1 jogador precisa entrar na sala para habilitar o início da partida.'}
+                : 'Aguardando pelo menos um jogador conectado.'}
             </p>
           </div>
         </div>
@@ -172,10 +177,10 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
               ? 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-green-950/40 active:scale-95 cursor-pointer'
               : 'bg-slate-800 text-slate-500 opacity-60 cursor-not-allowed border border-slate-700'
           }`}
-          title={canStart ? 'Iniciar partida' : 'Aguarde pelo menos 1 participante entrar'}
+          title={canStart ? 'Iniciar partida' : 'Aguardando pelo menos um jogador conectado.'}
         >
           <span>▶</span>
-          <span>{canStart ? `Iniciar Partida (${players.length})` : 'Aguardando Jogadores'}</span>
+          <span>{canStart ? `Iniciar Partida (${connectedPlayers})` : 'Aguardando Jogadores'}</span>
         </button>
       </div>
 

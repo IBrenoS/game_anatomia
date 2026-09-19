@@ -49,11 +49,16 @@ export default function HostControls({ roomState }: HostControlsProps) {
   };
 
   const players = useGameStore((s) => s.players);
+  const presences = useGameStore((s) => s.presences);
+  const connectedPlayers = players.filter(p => {
+    const pr = presences.find(pres => pres.playerId === p.playerId);
+    return pr ? pr.connected : false;
+  }).length;
 
   const renderStateButtons = () => {
     switch (roomState) {
       case 'LOBBY': {
-        const canStart = players.length > 0;
+        const canStart = connectedPlayers >= 1;
         return (
           <button 
             type="button"
@@ -64,10 +69,10 @@ export default function HostControls({ roomState }: HostControlsProps) {
                 ? 'bg-green-600 hover:bg-green-500 text-white active:scale-95 cursor-pointer shadow-green-950/40'
                 : 'bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed border border-slate-600'
             }`}
-            title={canStart ? 'Iniciar partida' : 'Aguarde pelo menos 1 participante entrar para iniciar'}
-            aria-label={canStart ? 'Iniciar partida' : 'Aguarde pelo menos 1 participante entrar para iniciar'}
+            title={canStart ? 'Iniciar partida' : 'Aguardando pelo menos um jogador conectado.'}
+            aria-label={canStart ? 'Iniciar partida' : 'Aguardando pelo menos um jogador conectado.'}
           >
-            {canStart ? `▶ Iniciar Partida (${players.length})` : 'Aguardando jogadores...'}
+            {canStart ? `▶ Iniciar Partida (${connectedPlayers})` : 'Aguardando pelo menos um jogador conectado.'}
           </button>
         );
       }
@@ -116,13 +121,6 @@ export default function HostControls({ roomState }: HostControlsProps) {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Avanço automático em ~5s
             </span>
-            <button 
-              type="button"
-              onClick={() => handleCommand('SHOW_RANKING')}
-              className="px-5 py-2 bg-blue-600/80 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
-            >
-              📊 Ver Classificação
-            </button>
           </div>
         );
       case 'ROUND_RANKING':
@@ -132,13 +130,6 @@ export default function HostControls({ roomState }: HostControlsProps) {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Próxima questão em ~5s
             </span>
-            <button 
-              type="button"
-              onClick={() => handleCommand('NEXT_QUESTION')}
-              className="px-5 py-2 bg-blue-600/80 hover:bg-blue-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
-            >
-              ➡ Próxima Pergunta
-            </button>
           </div>
         );
       case 'FINAL_RANKING':
@@ -148,13 +139,6 @@ export default function HostControls({ roomState }: HostControlsProps) {
               <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
               Pódio iniciando em ~5s
             </span>
-            <button 
-              type="button"
-              onClick={() => handleCommand('START_PODIUM')}
-              className="px-5 py-2 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-black rounded-xl text-sm shadow-lg transition-all cursor-pointer"
-            >
-              🏆 Iniciar Pódio
-            </button>
           </div>
         );
       case 'PODIUM':
@@ -164,13 +148,6 @@ export default function HostControls({ roomState }: HostControlsProps) {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               Encerramento automático em ~10s
             </span>
-            <button 
-              type="button"
-              onClick={() => setConfirmAction('END_GAME')}
-              className="px-5 py-2 bg-red-600/80 hover:bg-red-600 text-white font-bold rounded-xl text-sm shadow transition-all cursor-pointer"
-            >
-              🏁 Concluir Partida
-            </button>
           </div>
         );
       default:

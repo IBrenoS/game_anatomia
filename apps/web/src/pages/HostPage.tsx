@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useGameStore } from '../stores/gameStore.js';
 import { useGameSocket } from '../hooks/useGameSocket.js';
+import { wsManager } from '../lib/ws.js';
 import HostLobby from '../components/host/HostLobby.js';
 import HostQuestion from '../components/host/HostQuestion.js';
 import HostReveal from '../components/host/HostReveal.js';
@@ -29,6 +30,12 @@ export function HostPage() {
   const rankings = useGameStore((s) => s.rankings);
   const isFinalRanking = useGameStore((s) => s.isFinalRanking);
   const podium = useGameStore((s) => s.podium);
+
+  const totalPlayers = players.length;
+  const connectedPlayers = players.filter(p => {
+    const pr = presences.find(pres => pres.playerId === p.playerId);
+    return pr ? pr.connected : false;
+  }).length;
 
   useEffect(() => {
     if (pin) {
@@ -68,6 +75,7 @@ export function HostPage() {
               <button
                 type="button"
                 onClick={() => {
+                  wsManager.disconnect();
                   useGameStore.getState().resetStore();
                   navigate('/host');
                 }}
@@ -78,6 +86,7 @@ export function HostPage() {
               <button
                 type="button"
                 onClick={() => {
+                  wsManager.disconnect();
                   useGameStore.getState().resetStore();
                   navigate('/');
                 }}
@@ -112,8 +121,8 @@ export function HostPage() {
           )}
         </div>
         <div className="flex items-center gap-2 text-sm text-blue-200">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Jogadores: <strong className="text-white font-bold">{players.length}</strong></span>
+          <span className={`w-2.5 h-2.5 rounded-full ${connectedPlayers > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+          <span><strong className="text-white font-bold">{totalPlayers}</strong> participantes • <strong className="text-white font-bold">{connectedPlayers}</strong> conectados</span>
         </div>
       </header>
       

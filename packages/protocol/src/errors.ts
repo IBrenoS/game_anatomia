@@ -22,6 +22,10 @@ export const ProtocolError = {
   UNAUTHORIZED: 'UNAUTHORIZED',
   /** Payload malformado ou inválido */
   INVALID_PAYLOAD: 'INVALID_PAYLOAD',
+  /** Jogadores insuficientes para iniciar o jogo */
+  NOT_ENOUGH_PLAYERS: 'NOT_ENOUGH_PLAYERS',
+  /** Ação inválida para o estado atual */
+  INVALID_STATE: 'INVALID_STATE',
 } as const;
 
 export type ProtocolError = (typeof ProtocolError)[keyof typeof ProtocolError];
@@ -38,4 +42,6 @@ export const ERROR_MESSAGES: Record<ProtocolError, string> = {
   DEADLINE_EXCEEDED: 'O tempo para responder encerrou.',
   UNAUTHORIZED: 'Sessão inválida ou expirada.',
   INVALID_PAYLOAD: 'Dados inválidos ou malformados.',
+  NOT_ENOUGH_PLAYERS: 'Aguardando pelo menos um jogador conectado.',
+  INVALID_STATE: 'Ação não permitida no estado atual do jogo.',
 };

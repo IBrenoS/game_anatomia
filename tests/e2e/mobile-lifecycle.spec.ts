@@ -147,7 +147,7 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     await confirmEndBtn.click();
 
     // Host is now in QUESTION_REVEAL
-    await expect(hostPage.getByRole('button', { name: /ver classificação/i })).toBeVisible({ timeout: 8000 });
+    await expect(hostPage.getByText(/gabarito da rodada/i)).toBeVisible({ timeout: 8000 });
 
     // Mobile player returns to foreground WITHOUT manual reload
     await simulateForeground(mobilePage);
@@ -157,17 +157,12 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
 
     // =========================================================================
     // STATE 3: QUESTION_REVEAL
-    // Mobile player in reveal -> background -> host shows ranking -> foreground
+    // Mobile player in reveal -> background -> automatic transition to ranking -> foreground
     // =========================================================================
     await simulateBackground(mobilePage);
 
-    // Host moves to ROUND_RANKING
-    const showRankingBtn = hostPage.getByRole('button', { name: /ver classificação/i });
-    await expect(showRankingBtn).toBeVisible({ timeout: 5000 });
-    await showRankingBtn.click();
-
-    // Host is now in ROUND_RANKING (sees "Próxima Questão")
-    await expect(hostPage.getByRole('button', { name: /próxima (?:pergunta|questão)/i })).toBeVisible({ timeout: 8000 });
+    // Host automatically moves to ROUND_RANKING (~5s)
+    await expect(hostPage.getByText(/classificação/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player returns to foreground WITHOUT manual reload
     await simulateForeground(mobilePage);
@@ -178,17 +173,12 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
 
     // =========================================================================
     // STATE 4: ROUND_RANKING
-    // Mobile player in ranking -> background -> host advances to Q2 -> foreground
+    // Mobile player in ranking -> background -> automatic transition to Q2 -> foreground
     // =========================================================================
     await simulateBackground(mobilePage);
 
-    // Host moves to Question 2
-    const nextQBtn = hostPage.getByRole('button', { name: /próxima (?:pergunta|questão)/i });
-    await expect(nextQBtn).toBeVisible({ timeout: 5000 });
-    await nextQBtn.click();
-
-    // Host enters Question 2
-    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 12000 });
+    // Host automatically enters Question 2 (~5s)
+    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player returns to foreground WITHOUT manual reload
     await simulateForeground(mobilePage);
@@ -270,7 +260,7 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const confirmEndBtn = hostPage.getByRole('button', { name: /sim, encerrar/i });
     await expect(confirmEndBtn).toBeVisible({ timeout: 5000 });
     await confirmEndBtn.click();
-    await expect(hostPage.getByRole('button', { name: /ver classificação/i })).toBeVisible({ timeout: 8000 });
+    await expect(hostPage.getByText(/gabarito da rodada/i)).toBeVisible({ timeout: 8000 });
 
     // 4. Mobile player returns to foreground (triggers reconnect + RESUME_SESSION)
     await simulateForeground(mobilePage);
@@ -281,9 +271,8 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     // 5. Background + Socket drop again before host advances to ROUND_RANKING
     await simulateBackgroundWithSocketDrop(mobilePage);
 
-    // Host advances to ROUND_RANKING
-    await hostPage.getByRole('button', { name: /ver classificação/i }).click();
-    await expect(hostPage.getByRole('button', { name: /próxima (?:pergunta|questão)/i })).toBeVisible({ timeout: 8000 });
+    // Host automatically advances to ROUND_RANKING (~5s)
+    await expect(hostPage.getByText(/classificação/i)).toBeVisible({ timeout: 15000 });
 
     // Return to foreground
     await simulateForeground(mobilePage);
@@ -295,9 +284,8 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     // 6. Background + Socket drop before host advances to Question 2
     await simulateBackgroundWithSocketDrop(mobilePage);
 
-    // Host advances to Question 2
-    await hostPage.getByRole('button', { name: /próxima (?:pergunta|questão)/i }).click();
-    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 12000 });
+    // Host automatically advances to Question 2 (~5s)
+    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 15000 });
 
     // Return to foreground
     await simulateForeground(mobilePage);
@@ -347,7 +335,7 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const confirmEndBtn = hostPage.getByRole('button', { name: /sim, encerrar/i });
     await expect(confirmEndBtn).toBeVisible({ timeout: 5000 });
     await confirmEndBtn.click();
-    await expect(hostPage.getByRole('button', { name: /ver classificação/i })).toBeVisible({ timeout: 8000 });
+    await expect(hostPage.getByText(/gabarito da rodada/i)).toBeVisible({ timeout: 8000 });
 
     // Mobile player returns to foreground
     await simulateForeground(mobilePage);

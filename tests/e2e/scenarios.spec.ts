@@ -231,10 +231,123 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await expect(confirmBtn).toBeVisible({ timeout: 5000 });
     await confirmBtn.click();
 
-    // Should transition to reveal / ranking button appears
-    await expect(hostPage.getByRole('button', { name: /ver classificação/i })).toBeVisible({ timeout: 8000 });
+    // Should transition to reveal
+    await expect(hostPage.getByText(/gabarito da rodada/i)).toBeVisible({ timeout: 8000 });
+    await expect(hostPage.getByText(/avanço automático/i)).toBeVisible({ timeout: 8000 });
 
     await hostContext.close();
     await playerContext.close();
+  });
+
+  test('Scenario 7 (T02): 4 jogadores entram sequencialmente e aparecem em tempo real no host sem refresh', async ({ browser }) => {
+    // 1. Host creates room
+    const hostContext = await browser.newContext();
+    const hostPage = await hostContext.newPage();
+    await hostPage.goto('/host');
+    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
+    const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
+
+    const players = ['Ana', 'Beto', 'Caio', 'Duda'];
+    const playerContexts: any[] = [];
+
+    // 2. Each player joins sequentially and host must see them in real time WITHOUT refresh
+    for (let i = 0; i < players.length; i++) {
+      const name = players[i];
+      const count = i + 1;
+
+      const pContext = await browser.newContext();
+      playerContexts.push(pContext);
+      const pPage = await pContext.newPage();
+      await pPage.goto(`/join/${pin}`);
+      await pPage.getByLabel(/seu apelido/i).fill(name);
+      await pPage.getByRole('button', { name: /entrar na arena/i }).click();
+      await expect(pPage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
+      await expect(pPage.getByText(name).first()).toBeVisible({ timeout: 5000 });
+
+      // Host must reflect new participant and count immediately WITHOUT page reload
+      await expect(hostPage.getByText(name)).toBeVisible({ timeout: 8000 });
+      await expect(hostPage.getByText(`Participantes (${count}/${count} conectados)`)).toBeVisible({ timeout: 8000 });
+    }
+
+    // Verify all 4 players are visible in host roster
+    for (const name of players) {
+      await expect(hostPage.getByText(name)).toBeVisible();
+    }
+
+    // Verify Start button indicates ready with 4 connected players
+    const startBtn = hostPage.getByRole('button', { name: /iniciar partida/i }).first();
+    await expect(startBtn).toBeEnabled();
+
+    // Clean up
+    await hostContext.close();
+    for (const ctx of playerContexts) {
+      await ctx.close();
+    }
+  });
+
+  test('Scenario 8 (T13/T25): Partida A FINISHED -> Nova Partida -> Sala B funcional em tempo real sem limpar cache/storage', async ({ browser }) => {
+    // 1. Host creates Room A
+    const hostContext = await browser.newContext();
+    const hostPage = await hostContext.newPage();
+    await hostPage.goto('/host');
+    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
+    const pinA = hostPage.url().match(/\/host\/(\d{6})/)![1];
+
+    // Player joins Room A
+    const p1Context = await browser.newContext();
+    const p1Page = await p1Context.newPage();
+    await p1Page.goto(`/join/${pinA}`);
+    await p1Page.getByLabel(/seu apelido/i).fill('PlayerA');
+    await p1Page.getByRole('button', { name: /entrar na arena/i }).click();
+    await expect(p1Page).toHaveURL(new RegExp(`/play/${pinA}`), { timeout: 10000 });
+    await expect(hostPage.getByText('PlayerA')).toBeVisible({ timeout: 5000 });
+
+    // Host starts and ends game to FINISHED
+    await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
+    await expect(hostPage.getByRole('button', { name: /pausar rodada/i })).toBeVisible({ timeout: 12000 });
+
+    // Host pauses and ends game
+    await hostPage.getByRole('button', { name: /pausar rodada/i }).click();
+    const endGameBtn = hostPage.getByRole('button', { name: /finalizar partida/i });
+    await expect(endGameBtn).toBeVisible({ timeout: 5000 });
+    await endGameBtn.click();
+    const confirmEndBtn = hostPage.getByRole('button', { name: /finalizar agora/i });
+    await expect(confirmEndBtn).toBeVisible({ timeout: 5000 });
+    await confirmEndBtn.click();
+
+    // Host displays FINISHED
+    await expect(hostPage.getByText(/partida encerrada/i)).toBeVisible({ timeout: 10000 });
+    const novaPartidaBtn = hostPage.getByRole('button', { name: /nova partida/i });
+    await expect(novaPartidaBtn).toBeVisible();
+
+    // 2. Host clicks "Nova Partida" -> navigates to /host cleanly
+    await novaPartidaBtn.click();
+    await expect(hostPage).toHaveURL('/host', { timeout: 5000 });
+
+    // 3. Host launches Room B
+    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
+    const pinB = hostPage.url().match(/\/host\/(\d{6})/)![1];
+    expect(pinB).not.toBe(pinA);
+
+    // Host sees Room B lobby with PIN B
+    await expect(hostPage.getByText(pinB, { exact: true })).toBeVisible();
+
+    // 4. Player joins Room B
+    const p2Context = await browser.newContext();
+    const p2Page = await p2Context.newPage();
+    await p2Page.goto(`/join/${pinB}`);
+    await p2Page.getByLabel(/seu apelido/i).fill('PlayerB');
+    await p2Page.getByRole('button', { name: /entrar na arena/i }).click();
+    await expect(p2Page).toHaveURL(new RegExp(`/play/${pinB}`), { timeout: 10000 });
+
+    // Host sees PlayerB in real-time in Room B lobby without refresh
+    await expect(hostPage.getByText('PlayerB')).toBeVisible({ timeout: 8000 });
+
+    await hostContext.close();
+    await p1Context.close();
+    await p2Context.close();
   });
 });

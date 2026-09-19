@@ -1,13 +1,13 @@
 # DOCUMENTO DE PRODUTO E ENGENHARIA
 # Batalha Anatômica — Bovino × Equino
-## Product Requirements Document (PRD) — Versão 1.1
+## Product Requirements Document (PRD) — Versão 1.2
 **Jogo multiplayer de anatomia veterinária para apresentação presencial**
 
-* **Versão:** 1.1 (Revisão Canônica — Pacote Corretivo V2)
-* **Data:** 17 de setembro de 2026
-* **Status:** Especificação Canônica de Produto e Engenharia Atualizada
+* **Versão:** 1.2 (Hardening Mecânico Final — Pacote Corretivo V3)
+* **Data:** 18 de setembro de 2026
+* **Status:** Especificação Canônica de Produto e Engenharia Homologada
 * **Escopo:** MVP para uma partida efêmera com até 50 participantes simultâneos
-* **Referência Documental:** Atualização canônica integral de `PRD_Batalha_Anatomica_Engenharia.pdf`
+* **Referência Documental:** Atualização canônica integral de `PRD_Batalha_Anatomica_Engenharia.pdf` e Pacote V3
 
 ---
 
@@ -19,14 +19,16 @@ Os participantes (alunos) entram na partida pelo próprio celular sem necessidad
 
 O jogo é composto por dez questões previamente configuradas, cobrindo seis mecânicas didáticas distintas, com pontuação baseada no acerto (100, 200 ou 300 pontos) e um bônus de velocidade de 25% para respostas corretas submetidas nos primeiros 10 segundos da pergunta.
 
-A arquitetura adota o modelo de autoridade absoluta do servidor executando sobre **Cloudflare Workers** com **Durable Objects** (`GameRoom`), **WebSockets com Hibernation API**, **SQLite integrado ao Durable Object** para persistência efêmera em memória/disco local, e **Durable Object Alarms** para a orquestração do loop de jogo em tempo real.
+A arquitetura adota o modelo de autoridade absoluta do servidor executando sobre **Cloudflare Workers** com **Durable Objects** (`GameRoom`), **WebSockets com Hibernation API**, **SQLite integrado ao Durable Object** para persistência efêmera em memória/disco local, e **Durable Object Alarms** para a orquestração autônoma do loop de jogo em tempo real.
 
-### Decisões Principais da Versão 1.1 (Pacote Corretivo V2)
-1. **Game Loop 100% Automático no Fluxo Normal:** Transições de tela entre pergunta, revelação de gabarito (5 segundos), ranking de rodada (5 segundos), contagem regressiva (3 segundos) e próxima pergunta são orquestradas autonomamente pelo servidor via alarmes de Durable Object. O apresentador não precisa clicar manualmente em "Ver ranking" ou "Próxima pergunta" durante o curso normal da partida.
-2. **Resiliência Mobile de Primeiro Nível:** Clientes móveis tratam suspensão de abas e bloqueio de tela via listeners nativos de `visibilitychange`, `pageshow`, `focus` e status de conectividade `online`/`offline`. O retorno ao primeiro plano dispara imediatamente `RESUME_SESSION` ou `REQUEST_SNAPSHOT`, convergindo o estado local para o estado oficial da arena sem exigir recarregamento manual (F5) ou limpeza de cache.
-3. **Reconstrução Total por Snapshot:** Um único evento `SNAPSHOT` recebido do servidor reconstrói integralmente qualquer estado do ciclo de vida da partida (`LOBBY`, `COUNTDOWN`, `QUESTION_ACTIVE`, `PAUSED`, `QUESTION_REVEAL`, `ROUND_RANKING`, `FINAL_RANKING`, `PODIUM`, `FINISHED`).
-4. **Ciclo de Vida Completo e Encerramento Limpo:** Ao término da 10ª questão, o sistema avança para revelação final, ranking final, cerimônia de pódio e o estado `FINISHED`. Participantes e apresentador contam com botão explícito de retorno ao início que purga credenciais ativas do navegador e permite criar ou ingressar em novas partidas sem contaminação de cache.
-5. **Segurança Rigorosa da Sessão Administrativa:** O `hostToken` trafega exclusivamente via cookie HTTP seguro (`HttpOnly; SameSite=Strict; Secure em HTTPS`), jamais sendo exposto em JSON, `localStorage`, query string ou URLs de WebSocket.
+### Decisões Principais da Versão 1.2 (Pacote Corretivo V3 — Hardening Mecânico Final)
+1. **Game Loop 100% Automático e Eliminação de Botões de Caminho Feliz:** Transições de tela entre pergunta, revelação de gabarito (5 segundos), ranking de rodada (5 segundos), contagem regressiva (3 segundos) e próxima pergunta são orquestradas autonomamente pelo servidor via alarmes de Durable Object. Botões manuais de avanço de fluxo feliz foram eliminados da interface do apresentador, mantendo apenas controles de exceção (Pausar/Retomar e Encerrar Pergunta Antecipadamente).
+2. **Início Condicionado a Presença Ativa (`connectedPlayers >= 1`):** O jogo só pode ser iniciado quando houver pelo menos 1 jogador com status `CONNECTED`. O botão de início permanece desabilitado com feedback explícito enquanto nenhum jogador estiver ativamente conectado.
+3. **Pausa Estritamente Restrita a Pergunta Ativa:** A ação de pausa (`PAUSE_GAME`) só é permitida durante `QUESTION_ACTIVE`. Tentativas de pausar em `LOBBY`, `COUNTDOWN`, `QUESTION_REVEAL` ou `ROUND_RANKING` são expressamente rejeitadas pela máquina de estados e pelo servidor com `INVALID_STATE`.
+4. **Anti-Spoiler Total e Projeção Canônica por `canRevealAnswer`:** Snapshots e broadcasts durante `LOBBY`, `COUNTDOWN`, `QUESTION_ACTIVE` e `PAUSED` jamais incluem `correctOptionId` ou `explanation` para qualquer cliente (host, telão ou jogador). O gabarito só é exposto em estados pós-encerramento (`QUESTION_REVEAL`, `ROUND_RANKING`, `FINAL_RANKING`, `PODIUM`, `FINISHED`).
+5. **Expiração Autônoma de Presença via Alarmes de DO:** O servidor não depende de tráfego de entrada para expirar conexões silenciosas. O alarme periódico do Durable Object detecta inatividade de heartbeat (> 10s), transiciona o jogador para `TEMPORARILY_DISCONNECTED` e dispara autonomamente `checkAllAnswered()`, prevenindo travamento da rodada.
+6. **Autenticação Estrita do Host Exclusivamente via Cookie:** O `hostToken` é verificado estritamente através do cookie HttpOnly `batalha_host_${pin}`. Fallbacks por query string ou URLs de WebSocket foram totalmente removidos.
+7. **Isolamento de Sessão e Descarte de Conexões em Novas Partidas:** Ao clicar em "Nova Partida" ou "Voltar ao Início", o cliente desconecta explicitamente o WebSocket, reseta o Zustand store e limpa o estado interno do `WebSocketManager` (`seenEventIds`, `_roomVersion = 0`), garantindo que novas salas operem sem contaminação de cache.
 
 ---
 
@@ -505,22 +507,25 @@ interface EventEnvelope<TType extends string, TPayload> {
 |---|---|---|
 | **Entrada e Acesso sem Cadastro** | FR 001 a FR 008, AC 01 | Teste E2E com Playwright (`tests/e2e/scenarios.spec.ts`) |
 | **Game Loop Automático por Alarme** | FR 009 a FR 026, AC 01, AC 02, AC 12, AC 13 | Teste E2E de 10 questões completas (`tests/e2e/game-flow.spec.ts`) |
-| **Temporização, Bônus e Pausa** | FR 011, FR 027, FR 028, AC 03, AC 04, AC 09 | Testes unitários (`scoring.test.ts`) e de integração (T9) |
-| **Presença, Reconexão e Mobile** | FR 035 a FR 040, AC 06, AC 07 | Testes de integração (T5, T6, T7, T8) e carga |
-| **Concorrência Host vs. Respostas** | FR 027, AC 14 | Teste de integração (T10) com `last_state_version` |
+| **Temporização, Bônus e Pausa Estrita** | FR 011, FR 027, FR 028, AC 03, AC 04, AC 09 | Testes unitários (`scoring.test.ts`, `state-machine.test.ts`) e de integração (T09, T10) |
+| **Presença Ativa e Expiração Autônoma** | FR 035 a FR 040, AC 06, AC 07 | Testes de integração (T05, T06, T07, T08) e carga com 12 asserções |
+| **Início Condicionado (`connected >= 1`)** | FR 009, AC 01 | Testes unitários (`eligibility.test.ts`) e de integração (T01) |
+| **Anti-Spoiler e Projeção Canônica** | FR 012, AC 11 | Testes unitários (`state-machine.test.ts`) e de integração (T11, T12) |
+| **Concorrência Host vs. Respostas** | FR 027, AC 14 | Teste de integração com `last_state_version` |
 | **Pódio Adaptativo e Término** | FR 031 a FR 034, AC 12, AC 15 | Testes de integração (T12, T16) e E2E completo |
-| **Segurança do Host via Cookie** | FR 001, NFR 14 | Teste de integração (T17) com cookie `HttpOnly` |
-| **Escalabilidade sob 50 Conexões** | NFR 01 a NFR 04 | Script de carga real (`tests/load/websocket-load.ts`) com p95 < 150ms |
+| **Segurança do Host via Cookie Estrito** | FR 001, NFR 14 | Testes de integração (T01, T17) com cookie `HttpOnly` e sem query param fallback |
+| **Descarte de Sessão / Nova Partida** | FR 034, AC 15 | Teste de integração (T13) comprovando criação de sala B e conexão sem contaminação |
+| **Escalabilidade sob 50 Conexões** | NFR 01 a NFR 04 | Script de carga real (`tests/load/websocket-load.ts`) com 12 asserções e p95 < 60ms |
 | **Acessibilidade e Usabilidade** | NFR 06 a NFR 09 | Auditoria visual, navegação por teclado e reduced-motion |
 
 ---
 
 ## 16. Aprovação Formal
 
-A assinatura desta revisão confirma o alinhamento definitivo das decisões de produto, arquitetura de software, contratos de protocolo e critérios de aceitação do **Pacote Corretivo V2**.
+A assinatura desta revisão confirma o alinhamento definitivo das decisões de produto, arquitetura de software, contratos de protocolo e critérios de aceitação do **Pacote Corretivo V3 — Hardening Mecânico Final**.
 
 | Responsabilidade | Nome do Responsável | Data | Parecer / Status |
 |---|---|---|---|
-| **Engenharia de Software** | Antigravity AI & Engenharia Fullstack | 17/09/2026 | ✅ Aprovado com 100% dos Gates Verdes |
-| **Gestão de Produto** | Equipe de Produto Batalha Anatômica | 17/09/2026 | ✅ Homologado (Versão 1.1 Canônica) |
-| **Conteúdo Acadêmico** | Docência de Anatomia Veterinária | 17/09/2026 | ✅ 10 Questões Validadas e Aprovadas |
+| **Engenharia de Software** | Antigravity AI & Engenharia Fullstack | 18/09/2026 | ✅ Aprovado com 100% dos Gates Verdes |
+| **Gestão de Produto** | Equipe de Produto Batalha Anatômica | 18/09/2026 | ✅ Homologado (Versão 1.2 Canônica) |
+| **Conteúdo Acadêmico** | Docência de Anatomia Veterinária | 18/09/2026 | ✅ 10 Questões Validadas e Aprovadas |

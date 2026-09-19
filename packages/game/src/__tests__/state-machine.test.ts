@@ -5,6 +5,7 @@ import {
   assertTransition,
   isTerminal,
   toPublicQuestion,
+  canRevealAnswer,
 } from '../state-machine';
 import { GameState, Question } from '@batalha/protocol';
 
@@ -128,6 +129,32 @@ describe('state-machine', () => {
 
       // Cannot revert from PODIUM back to FINAL_RANKING
       expect(canTransition('PODIUM', 'FINAL_RANKING')).toBe(false);
+    });
+
+    it('permits pause ONLY from QUESTION_ACTIVE and denies pause from any other state', () => {
+      expect(canTransition('QUESTION_ACTIVE', 'PAUSED')).toBe(true);
+      expect(canTransition('COUNTDOWN', 'PAUSED')).toBe(false);
+      expect(canTransition('QUESTION_REVEAL', 'PAUSED')).toBe(false);
+      expect(canTransition('ROUND_RANKING', 'PAUSED')).toBe(false);
+      expect(canTransition('LOBBY', 'PAUSED')).toBe(false);
+      expect(canTransition('FINAL_RANKING', 'PAUSED')).toBe(false);
+      expect(canTransition('PODIUM', 'PAUSED')).toBe(false);
+      expect(canTransition('FINISHED', 'PAUSED')).toBe(false);
+    });
+
+    it('canRevealAnswer strictly authorizes only post-round phases (anti-spoiler)', () => {
+      // Forbidden: before or during answering or while paused / resuming
+      expect(canRevealAnswer('LOBBY')).toBe(false);
+      expect(canRevealAnswer('COUNTDOWN')).toBe(false);
+      expect(canRevealAnswer('QUESTION_ACTIVE')).toBe(false);
+      expect(canRevealAnswer('PAUSED')).toBe(false);
+
+      // Authorized: after question closes
+      expect(canRevealAnswer('QUESTION_REVEAL')).toBe(true);
+      expect(canRevealAnswer('ROUND_RANKING')).toBe(true);
+      expect(canRevealAnswer('FINAL_RANKING')).toBe(true);
+      expect(canRevealAnswer('PODIUM')).toBe(true);
+      expect(canRevealAnswer('FINISHED')).toBe(true);
     });
   });
 });

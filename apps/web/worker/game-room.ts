@@ -16,7 +16,7 @@ import {
   calculatePoints, buildRanking, canTransition, assertTransition,
   toPublicQuestion, isPlayerEligible, isPlayerActive,
   normalizeNickname, isNicknameUnique, shouldQuestionEnd,
-  getPlayerPresenceStatus, getRoomPlayerCounts,
+  getPlayerPresenceStatus, getRoomPlayerCounts, canRevealAnswer,
 } from '@batalha/game';
 import { questions } from '@batalha/content';
 
@@ -231,18 +231,16 @@ export class GameRoom extends DurableObject {
     }
     
     const role = url.searchParams.get('role') || 'player';
-    let token = url.searchParams.get('token') || '';
 
-    // Support host token from HttpOnly cookie as well as query param (P1.8)
-    if (!token && role === 'host') {
+    // P1.8 / Section 13: Host authentication exclusively via HttpOnly cookie (no query param fallback)
+    if (role === 'host') {
       const cookie = request.headers.get('cookie') || '';
       const match = cookie.match(new RegExp(`(?:^|;\\s*)batalha_host_${this.room.pin}=([^;]+)`));
-      if (match) {
-        token = match[1];
+      const token = match ? match[1] : '';
+      if (!token) {
+        return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
       }
-    }
 
-    if (role === 'host') {
       const tokenHash = await this.hashToken(token);
       const rows = this.sql.exec('SELECT host_token_hash FROM room WHERE pin = ?', this.room.pin).toArray();
       if (rows.length === 0 || rows[0].host_token_hash !== tokenHash) {
@@ -336,19 +334,88 @@ export class GameRoom extends DurableObject {
     await this.webSocketClose(ws, 1006, 'error');
   }
 
-  // ─── Alarm handler (deadline timer) ─────────
+  // ─── Presence Expiration & Alarm Scheduling (Section 8) ─────
+
+  private checkAndExpirePresence(now: number = Date.now()): boolean {
+    if (!this.room) return false;
+    const effectivePresences = this.getEffectivePresences(now);
+    let expiredAny = false;
+
+    for (const pr of effectivePresences) {
+      if (!pr.connected) {
+        const rows = this.sql.exec('SELECT connected FROM presence WHERE player_id = ?', pr.playerId).toArray();
+        if (rows.length > 0 && rows[0].connected === 1) {
+          this.sql.exec('UPDATE presence SET connected = 0 WHERE player_id = ?', pr.playerId);
+          this.broadcastPresenceChange(pr.playerId, false);
+          expiredAny = true;
+        }
+      }
+    }
+
+    if (expiredAny && this.room.status === GameState.QUESTION_ACTIVE) {
+      this.checkAllAnswered();
+    }
+
+    return expiredAny;
+  }
+
+  private getNextAlarmTime(phaseDeadline: number | null = null, now: number = Date.now()): number | null {
+    const connectedPresences = this.getEffectivePresences(now).filter(p => p.connected);
+    let earliestPresenceExpiry: number | null = null;
+    for (const p of connectedPresences) {
+      const expiry = p.lastSeenAt + PRESENCE_TIMEOUT_MS + 100;
+      if (expiry > now) {
+        if (earliestPresenceExpiry === null || expiry < earliestPresenceExpiry) {
+          earliestPresenceExpiry = expiry;
+        }
+      }
+    }
+
+    if (phaseDeadline !== null && earliestPresenceExpiry !== null) {
+      return Math.min(phaseDeadline, earliestPresenceExpiry);
+    }
+    return phaseDeadline ?? earliestPresenceExpiry;
+  }
+
+  private scheduleNextAlarm(phaseDeadline: number | null = null): void {
+    const nextAlarm = this.getNextAlarmTime(phaseDeadline);
+    if (nextAlarm !== null) {
+      this.ctx.storage.setAlarm(nextAlarm);
+    }
+  }
+
+  // ─── Alarm handler (phase timer + autonomous presence) ──────
 
   async alarm(): Promise<void> {
     this.loadRoom();
     if (!this.room) return;
-    
+    const initialStatus = this.room.status;
+    const now = Date.now();
+
+    // 1. Check autonomous presence expiry
+    const expiredAny = this.checkAndExpirePresence(now);
+
+    // If presence check already triggered a state change (e.g. all answered -> QUESTION_REVEAL),
+    // do not fall through to process the new phase in the same alarm execution!
+    if (this.room.status !== initialStatus) {
+      return;
+    }
+
+    // 2. Process phase transitions
     switch (this.room.status) {
       case GameState.COUNTDOWN:
         this.startQuestion();
         break;
-      case GameState.QUESTION_ACTIVE:
-        this.endCurrentQuestion('deadline');
+      case GameState.QUESTION_ACTIVE: {
+        const round = this.getCurrentRound();
+        if (round && (now >= round.deadlineAt || !expiredAny)) {
+          this.endCurrentQuestion('deadline');
+        } else {
+          // Presence expired mid-round, but others still have not answered; reschedule deadline
+          this.scheduleNextAlarm(round?.deadlineAt ?? null);
+        }
         break;
+      }
       case GameState.QUESTION_REVEAL:
         this.handleShowRanking();
         break;
@@ -364,6 +431,8 @@ export class GameRoom extends DurableObject {
       case GameState.FINISHED:
         this.cleanupRoom();
         break;
+      default:
+        this.scheduleNextAlarm(null);
     }
   }
 
@@ -456,9 +525,15 @@ export class GameRoom extends DurableObject {
       },
       this.room!.roomVersion
     ));
+
+    // Broadcast live presence change (connected = true)
+    this.broadcastPresenceChange(playerId, true);
     
     // Send snapshot to the new player
     this.sendSnapshot(ws, 'player', playerId);
+
+    // Schedule presence check alarm
+    this.scheduleNextAlarm();
   }
 
   private async handleResumeSession(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
@@ -751,7 +826,7 @@ export class GameRoom extends DurableObject {
     
     switch (command) {
       case 'START_GAME':
-        this.handleStartGame(correlationId);
+        this.handleStartGame(correlationId, ws);
         break;
       case 'LOCK_ENTRIES':
         this.handleLockEntries(correlationId);
@@ -763,7 +838,7 @@ export class GameRoom extends DurableObject {
         this.handleRemovePlayer(data as { playerId: string }, correlationId);
         break;
       case 'PAUSE':
-        this.handlePause(correlationId);
+        this.handlePause(correlationId, ws);
         break;
       case 'RESUME':
         this.handleResume(correlationId);
@@ -803,16 +878,25 @@ export class GameRoom extends DurableObject {
 
   // ─── Game Flow Methods ──────────────────────
 
-  private handleStartGame(correlationId?: string): void {
+  private handleStartGame(correlationId?: string, ws?: WebSocket): void {
     if (!this.room) return;
+    const now = Date.now();
     const players = this.getActivePlayers();
-    if (players.length === 0) return;
+    const presences = this.getEffectivePresences(now);
+    const counts = getRoomPlayerCounts(players, presences, 0, now);
+
+    if (counts.connectedPlayers < 1) {
+      if (ws) {
+        this.sendError(ws, ProtocolError.NOT_ENOUGH_PLAYERS, 'Aguardando pelo menos um jogador conectado.', correlationId);
+      }
+      return;
+    }
     
     this.transitionTo(GameState.COUNTDOWN, correlationId);
     this.setEntryLocked(true);
     
     // Set alarm for countdown end
-    this.ctx.storage.setAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
   }
 
   private startQuestion(): void {
@@ -856,7 +940,7 @@ export class GameRoom extends DurableObject {
     this.loadRoom();
     
     // Set deadline alarm
-    this.ctx.storage.setAlarm(deadlineAt);
+    this.scheduleNextAlarm(deadlineAt);
     
     // Broadcast QUESTION_STARTED with public question (no answer)
     const publicQ = toPublicQuestion(question);
@@ -954,7 +1038,7 @@ export class GameRoom extends DurableObject {
     }
 
     // P0.15: Schedule automatic reveal transition to ranking (5 seconds)
-    this.ctx.storage.setAlarm(Date.now() + REVEAL_DURATION_MS);
+    this.scheduleNextAlarm(Date.now() + REVEAL_DURATION_MS);
   }
 
   private handleShowRanking(correlationId?: string): void {
@@ -976,9 +1060,9 @@ export class GameRoom extends DurableObject {
 
     // P0.17 & P0.19: Schedule next automatic step
     if (isLastQuestion) {
-      this.ctx.storage.setAlarm(Date.now() + FINAL_RANKING_DURATION_MS);
+      this.scheduleNextAlarm(Date.now() + FINAL_RANKING_DURATION_MS);
     } else {
-      this.ctx.storage.setAlarm(Date.now() + ROUND_RANKING_DURATION_MS);
+      this.scheduleNextAlarm(Date.now() + ROUND_RANKING_DURATION_MS);
     }
   }
 
@@ -987,7 +1071,7 @@ export class GameRoom extends DurableObject {
     if (this.room.currentQuestionIndex >= TOTAL_QUESTIONS - 1) return;
     
     this.transitionTo(GameState.COUNTDOWN, correlationId);
-    this.ctx.storage.setAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
   }
 
   private handleStartPodium(correlationId?: string): void {
@@ -1005,7 +1089,7 @@ export class GameRoom extends DurableObject {
     ));
 
     // P0.21 & P0.22: Schedule automatic transition to FINISHED after ceremony
-    this.ctx.storage.setAlarm(Date.now() + PODIUM_DURATION_MS);
+    this.scheduleNextAlarm(Date.now() + PODIUM_DURATION_MS);
   }
 
   private handleEndGame(correlationId?: string): void {
@@ -1023,34 +1107,30 @@ export class GameRoom extends DurableObject {
     ));
     
     // Set cleanup alarm
-    this.ctx.storage.setAlarm(Date.now() + ROOM_EXPIRY_MS);
+    this.scheduleNextAlarm(Date.now() + ROOM_EXPIRY_MS);
   }
 
-  private handlePause(correlationId?: string): void {
+  private handlePause(correlationId?: string, ws?: WebSocket): void {
     if (!this.room) return;
     const currentStatus = this.room.status;
-    if (
-      currentStatus !== GameState.QUESTION_ACTIVE &&
-      currentStatus !== GameState.COUNTDOWN &&
-      currentStatus !== GameState.QUESTION_REVEAL &&
-      currentStatus !== GameState.ROUND_RANKING
-    ) {
+    if (currentStatus !== GameState.QUESTION_ACTIVE) {
+      if (ws) {
+        this.sendError(ws, ProtocolError.INVALID_STATE, 'Pause is only permitted during QUESTION_ACTIVE', correlationId);
+      }
       return;
     }
     
-    if (currentStatus === GameState.QUESTION_ACTIVE) {
-      const round = this.getCurrentRound();
-      if (round) {
-        const now = Date.now();
-        const remainingMs = Math.max(0, round.deadlineAt - now);
-        const activeInThisSegment = Math.max(0, now - round.startedAt);
-        const accumulatedActiveMs = round.accumulatedActiveMs + activeInThisSegment;
-        
-        this.sql.exec(
-          `UPDATE rounds SET state = 'paused', remaining_ms = ?, accumulated_active_ms = ? WHERE question_id = ?`,
-          remainingMs, accumulatedActiveMs, round.questionId
-        );
-      }
+    const round = this.getCurrentRound();
+    if (round) {
+      const now = Date.now();
+      const remainingMs = Math.max(0, round.deadlineAt - now);
+      const activeInThisSegment = Math.max(0, now - round.startedAt);
+      const accumulatedActiveMs = round.accumulatedActiveMs + activeInThisSegment;
+      
+      this.sql.exec(
+        `UPDATE rounds SET state = 'paused', remaining_ms = ?, accumulated_active_ms = ? WHERE question_id = ?`,
+        remainingMs, accumulatedActiveMs, round.questionId
+      );
     }
     
     this.ctx.storage.deleteAlarm();
@@ -1064,7 +1144,7 @@ export class GameRoom extends DurableObject {
     this.transitionTo(GameState.COUNTDOWN, correlationId);
     
     // After countdown, we'll resume the question with remainingMs
-    this.ctx.storage.setAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
   }
 
   private handleLockEntries(correlationId?: string): void {
@@ -1384,16 +1464,20 @@ export class GameRoom extends DurableObject {
         };
       });
 
-      if (this.room.status === GameState.QUESTION_ACTIVE || this.room.status === GameState.PAUSED) {
-        currentQuestion = toPublicQuestion(q);
-        if (role === 'host') {
-          distribution = computedDistribution;
-        }
-      } else {
+      if (canRevealAnswer(this.room.status)) {
         currentQuestion = q;
         distribution = computedDistribution;
         correctOptionId = q.correctOptionId;
         explanation = q.explanation ?? null;
+      } else {
+        currentQuestion = toPublicQuestion(q);
+        correctOptionId = null;
+        explanation = null;
+        if ((this.room.status === GameState.QUESTION_ACTIVE || this.room.status === GameState.PAUSED) && role === 'host') {
+          distribution = computedDistribution;
+        } else {
+          distribution = [];
+        }
       }
     }
 
@@ -1426,7 +1510,7 @@ export class GameRoom extends DurableObject {
         const q = questions[this.room.currentQuestionIndex];
         const activeAnswer = (personalAnswers as any[]).find(a => a.questionId === q.id);
         if (activeAnswer) {
-          if (this.room.status !== GameState.QUESTION_ACTIVE && this.room.status !== GameState.PAUSED) {
+          if (canRevealAnswer(this.room.status)) {
             personalResult = {
               correct: activeAnswer.correct,
               selectedOptionId: activeAnswer.optionId,
@@ -1434,7 +1518,7 @@ export class GameRoom extends DurableObject {
               responseTimeMs: activeAnswer.responseTimeMs,
             };
           }
-        } else if (this.room.status === GameState.QUESTION_REVEAL || this.room.status === GameState.ROUND_RANKING) {
+        } else if (canRevealAnswer(this.room.status)) {
           personalResult = {
             correct: false,
             selectedOptionId: '',
