@@ -9,6 +9,7 @@ import {
 } from '@batalha/protocol';
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting';
+export type GameSocketRole = 'host' | 'player' | 'screen';
 
 export class WebSocketManager {
   private ws: WebSocket | null = null;
@@ -22,7 +23,7 @@ export class WebSocketManager {
   private handlers = new Map<string, Set<(payload: any, envelope: any) => void>>();
   private stateHandlers = new Set<(state: ConnectionState) => void>();
   private currentPin: string | null = null;
-  private currentRole: string | null = null;
+  private currentRole: GameSocketRole | null = null;
   private currentToken: string | undefined;
 
   constructor() {
@@ -55,7 +56,7 @@ export class WebSocketManager {
     }
   }
 
-  connect(pin: string, role: string, token?: string): void {
+  connect(pin: string, role: GameSocketRole, token?: string): void {
     if (this.ws) {
       if (
         this.currentPin === pin &&
@@ -372,9 +373,32 @@ export class WebSocketManager {
   }
 }
 
-// Singleton
-export const wsManager = new WebSocketManager();
+const managers = new Map<GameSocketRole, WebSocketManager>();
+
+function exposeManagersForDiagnostics(): void {
+  if (typeof window === 'undefined') return;
+
+  const exposed = Object.fromEntries(managers.entries());
+  (window as typeof window & { __wsManagers?: Partial<Record<GameSocketRole, WebSocketManager>> }).__wsManagers = exposed;
+}
+
+export function getWebSocketManager(role: GameSocketRole): WebSocketManager {
+  const existing = managers.get(role);
+  if (existing) return existing;
+
+  const manager = new WebSocketManager();
+  managers.set(role, manager);
+  exposeManagersForDiagnostics();
+  return manager;
+}
+
+export function disconnectWebSocketManager(role: GameSocketRole): void {
+  managers.get(role)?.disconnect();
+}
+
+// Compatibility alias while existing consumers migrate to role-specific managers.
+export const wsManager = getWebSocketManager('player');
 
 if (typeof window !== 'undefined') {
-  (window as any).__wsManager = wsManager;
+  (window as typeof window & { __wsManager?: WebSocketManager }).__wsManager = wsManager;
 }

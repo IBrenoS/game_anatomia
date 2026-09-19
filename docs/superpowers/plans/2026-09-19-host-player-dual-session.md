@@ -66,7 +66,7 @@
 - Produces for tests: `installFakeWebSocket(): { sockets: FakeWebSocket[]; emit(socket, envelope): void; cleanup(): void }`
 - Preserves: `WebSocketManager.connect(pin: string, role: GameSocketRole, token?: string): void`
 
-- [ ] **Step 1: Escrever testes falhando para coexistência e isolamento**
+- [x] **Step 1: Escrever testes falhando para coexistência e isolamento**
 
 Adicionar casos literais em `ws.test.ts`:
 
@@ -103,13 +103,13 @@ it('T10: desconectar host não fecha player', () => {
 Incluir limpeza chamando `disconnectWebSocketManager` para cada papel no `afterEach`.
 Mover o `FakeWebSocket` já existente para `ws.testUtils.ts`; `installFakeWebSocket` deve instalar os globals, retornar a lista de sockets e restaurar os globals em `cleanup`.
 
-- [ ] **Step 2: Executar RED**
+- [x] **Step 2: Executar RED**
 
 Run: `pnpm vitest run apps/web/src/lib/ws.test.ts`
 
 Expected: FAIL porque `getWebSocketManager` e `disconnectWebSocketManager` ainda não existem.
 
-- [ ] **Step 3: Implementar registry mínimo**
+- [x] **Step 3: Implementar registry mínimo**
 
 Em `ws.ts`, tipar `currentRole`, `connect` e o registry:
 
@@ -133,13 +133,13 @@ export function disconnectWebSocketManager(role: GameSocketRole): void {
 
 Expor em desenvolvimento `window.__wsManagers` como objeto somente de inspeção, sem manter o alias singleton.
 
-- [ ] **Step 4: Executar GREEN e regressão do manager**
+- [x] **Step 4: Executar GREEN e regressão do manager**
 
 Run: `pnpm vitest run apps/web/src/lib/ws.test.ts`
 
 Expected: PASS em todos os testes, inclusive heartbeat, ordering, foreground e resume existentes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add apps/web/src/lib/ws.ts apps/web/src/lib/ws.test.ts apps/web/src/lib/ws.testUtils.ts

@@ -1,48 +1,55 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WebSocketManager } from './ws';
+import {
+  disconnectWebSocketManager,
+  getWebSocketManager,
+  WebSocketManager,
+} from './ws';
+import { FakeWebSocket, installFakeWebSocket } from './ws.testUtils';
 
-class FakeWebSocket {
-  static readonly CONNECTING = 0;
-  static readonly OPEN = 1;
-
-  readonly sentMessages: string[] = [];
-  readyState = FakeWebSocket.CONNECTING;
-  onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
-  onerror: ((error: unknown) => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-
-  constructor(readonly url: string) {
-    sockets.push(this);
-  }
-
-  open(): void {
-    this.readyState = FakeWebSocket.OPEN;
-    this.onopen?.();
-  }
-
-  send(message: string): void {
-    this.sentMessages.push(message);
-  }
-
-  close(): void {
-    this.readyState = 3;
-  }
-}
-
-const sockets: FakeWebSocket[] = [];
+let fakeWebSocket: ReturnType<typeof installFakeWebSocket>;
+let sockets: FakeWebSocket[];
 
 describe('WebSocketManager heartbeat', () => {
   beforeEach(() => {
-    sockets.length = 0;
     vi.useFakeTimers();
-    vi.stubGlobal('window', { location: { origin: 'https://game.example.com' } });
-    vi.stubGlobal('WebSocket', FakeWebSocket);
+    fakeWebSocket = installFakeWebSocket();
+    sockets = fakeWebSocket.sockets;
   });
 
   afterEach(() => {
+    disconnectWebSocketManager('host');
+    disconnectWebSocketManager('player');
+    disconnectWebSocketManager('screen');
     vi.useRealTimers();
-    vi.unstubAllGlobals();
+    fakeWebSocket.cleanup();
+  });
+
+  it('T3: mantém sockets host e player simultâneos', () => {
+    const host = getWebSocketManager('host');
+    const player = getWebSocketManager('player');
+
+    host.connect('123456', 'host');
+    player.connect('123456', 'player', 'player-token');
+
+    expect(host).not.toBe(player);
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0].url).toContain('role=host');
+    expect(sockets[1].url).toContain('role=player');
+    expect(sockets[0].readyState).toBe(FakeWebSocket.CONNECTING);
+  });
+
+  it('T10: desconectar host não fecha player', () => {
+    const host = getWebSocketManager('host');
+    const player = getWebSocketManager('player');
+    host.connect('123456', 'host');
+    player.connect('123456', 'player', 'player-token');
+    sockets.forEach(socket => socket.open());
+
+    disconnectWebSocketManager('host');
+
+    expect(sockets[0].readyState).toBe(3);
+    expect(sockets[1].readyState).toBe(FakeWebSocket.OPEN);
+    expect(player.state).toBe('connected');
   });
 
   it('sends the static ping frame handled by Durable Object auto-response', () => {
