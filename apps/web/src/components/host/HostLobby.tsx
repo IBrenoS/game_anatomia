@@ -54,11 +54,8 @@ export default function HostLobby({ players, presences, pin }: HostLobbyProps) {
     wsManager.sendHostCommand(command, wsManager.roomVersion);
   };
 
-  const totalPlayers = players.length;
-  const connectedPlayers = players.filter(p => {
-    const pr = presences.find(pres => pres.playerId === p.playerId);
-    return pr ? pr.connected : false;
-  }).length;
+  const totalPlayers = useGameStore(s => s.totalPlayers);
+  const connectedPlayers = useGameStore(s => s.connectedPlayers);
   const canStart = connectedPlayers >= 1;
 
   const handleStartGame = () => {

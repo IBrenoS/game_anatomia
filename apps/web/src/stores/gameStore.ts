@@ -50,6 +50,8 @@ interface GameStoreState {
   currentQuestion: PublicQuestion | null;
   startedAt: number | null;
   deadlineAt: number | null;
+  remainingMs: number | null;
+  countdownKind: 'INITIAL' | 'NEXT_QUESTION' | 'RESUME' | null;
   
   // Answer state
   selectedOptionId: string | null;
@@ -79,6 +81,10 @@ interface GameStoreState {
   // Round progress
   answeredCount: number;
   totalEligible: number;
+  totalPlayers: number;
+  connectedPlayers: number;
+  eligiblePlayers: number;
+  activeEligiblePlayers: number;
 
   // Answer rejected state
   answerRejected: { code: string; message: string } | null;
@@ -127,6 +133,8 @@ const initialState = {
   currentQuestion: null,
   startedAt: null,
   deadlineAt: null,
+  remainingMs: null,
+  countdownKind: null,
   selectedOptionId: null,
   answerSubmitted: false,
   answerAcceptedAt: null,
@@ -134,6 +142,10 @@ const initialState = {
   countdownStartedAt: null,
   answeredCount: 0,
   totalEligible: 0,
+  totalPlayers: 0,
+  connectedPlayers: 0,
+  eligiblePlayers: 0,
+  activeEligiblePlayers: 0,
   correctOptionId: null,
   explanation: null,
   distribution: [],
@@ -172,7 +184,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   handleSnapshot: (payload) => set((state) => {
-    const status = payload.room?.status ?? state.roomState;
+    const status = payload.gameState ?? payload.room?.status ?? state.roomState;
     const incomingVersion = payload.room?.roomVersion ?? state.roomVersion;
     if (incomingVersion > 0 && incomingVersion < state.roomVersion) {
       // Discard stale snapshot that is strictly older than current store version
@@ -206,6 +218,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         answerSubmitted = false;
       }
       personalResult = null;
+    } else if (status === 'COUNTDOWN' && payload.countdownKind === 'RESUME') {
+      selectedOptionId = payload.selectedOptionId ?? state.selectedOptionId;
+      answerSubmitted = payload.answerSubmitted ?? state.answerSubmitted;
+      answerAcceptedAt = state.answerAcceptedAt;
+      personalResult = null;
     } else if (status === 'QUESTION_REVEAL') {
       if (payload.personalResult) {
         personalResult = payload.personalResult;
@@ -228,6 +245,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       answerSubmitted = Boolean(answerForActive);
     } else if (status === 'ROUND_RANKING' || status === 'FINAL_RANKING') {
       personalResult = payload.personalResult ?? state.personalResult;
+    }
+
+    if (
+      (status === 'QUESTION_ACTIVE' || status === 'PAUSED' || (status === 'COUNTDOWN' && payload.countdownKind === 'RESUME'))
+      && typeof payload.answerSubmitted === 'boolean'
+    ) {
+      answerSubmitted = payload.answerSubmitted;
+      selectedOptionId = payload.selectedOptionId ?? selectedOptionId;
     }
 
     const pid = payload.playerId ?? state.playerId;
@@ -265,18 +290,24 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     const pin = payload.room?.pin ?? state.pin;
     const reconnectToken = state.reconnectToken ?? (pin && typeof localStorage !== 'undefined' ? localStorage.getItem(`batalha_session_${pin}`) : null);
-    const currentQuestion = payload.currentQuestion !== undefined ? payload.currentQuestion : state.currentQuestion;
+    const currentQuestion = payload.question !== undefined
+      ? payload.question
+      : (payload.currentQuestion !== undefined ? payload.currentQuestion : state.currentQuestion);
 
     const isCountdown = status === 'COUNTDOWN';
+    const authoritativePhaseStartedAt = payload.phaseStartedAt ?? payload.room?.phaseStartedAt;
+    const authoritativePhaseDeadlineAt = payload.phaseDeadlineAt ?? payload.room?.phaseDeadlineAt;
     const countdownStartedAt = isCountdown
-      ? (state.countdownStartedAt ?? Date.now())
+      ? (authoritativePhaseStartedAt ?? state.countdownStartedAt ?? Date.now())
       : null;
-    const startedAt = isCountdown
-      ? (payload.round?.startedAt ?? countdownStartedAt)
-      : (payload.round?.startedAt ?? (status === 'QUESTION_ACTIVE' ? state.startedAt : null));
-    const deadlineAt = isCountdown
-      ? (payload.round?.deadlineAt ?? (countdownStartedAt ? countdownStartedAt + 3000 : Date.now() + 3000))
-      : (payload.round?.deadlineAt ?? (status === 'QUESTION_ACTIVE' ? state.deadlineAt : null));
+    const startedAt = authoritativePhaseStartedAt
+      ?? (isCountdown ? countdownStartedAt : (payload.round?.startedAt ?? (status === 'QUESTION_ACTIVE' ? state.startedAt : null)));
+    const deadlineAt = authoritativePhaseDeadlineAt
+      ?? (status === 'PAUSED'
+        ? null
+        : (isCountdown
+          ? (countdownStartedAt ? countdownStartedAt + 3000 : Date.now() + 3000)
+          : (payload.round?.deadlineAt ?? (status === 'QUESTION_ACTIVE' ? state.deadlineAt : null))));
 
     const previousRankings = (state.rankings.length > 0 && Array.isArray(payload.rankings) && state.rankings !== payload.rankings)
       ? state.rankings
@@ -297,6 +328,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       countdownStartedAt,
       startedAt,
       deadlineAt,
+      remainingMs: payload.remainingMs ?? (status === 'PAUSED' ? payload.round?.remainingMs ?? state.remainingMs : null),
+      countdownKind: payload.countdownKind ?? payload.room?.countdownKind ?? null,
       playerId: pid,
       selectedOptionId,
       answerSubmitted,
@@ -310,8 +343,12 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       correctOptionId: status === 'QUESTION_REVEAL' ? (payload.correctOptionId ?? state.correctOptionId) : null,
       explanation: status === 'QUESTION_REVEAL' ? (payload.explanation ?? state.explanation) : null,
       isFinalRanking: payload.isFinalRanking ?? (status === 'FINAL_RANKING'),
-      answeredCount: payload.counts?.answeredCount ?? state.answeredCount,
-      totalEligible: payload.counts?.totalEligible ?? state.totalEligible,
+      answeredCount: payload.answeredCount ?? payload.counts?.answeredCount ?? state.answeredCount,
+      totalEligible: payload.activeEligiblePlayers ?? payload.counts?.activeEligiblePlayers ?? payload.counts?.totalEligible ?? state.totalEligible,
+      totalPlayers: payload.totalPlayers ?? payload.counts?.totalPlayers ?? state.totalPlayers,
+      connectedPlayers: payload.connectedPlayers ?? payload.counts?.connectedPlayers ?? state.connectedPlayers,
+      eligiblePlayers: payload.eligiblePlayers ?? payload.counts?.eligiblePlayers ?? state.eligiblePlayers,
+      activeEligiblePlayers: payload.activeEligiblePlayers ?? payload.counts?.activeEligiblePlayers ?? state.activeEligiblePlayers,
     };
   }),
 
@@ -322,13 +359,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       players: [...state.players, {
         playerId: payload.playerId,
         nickname: payload.nickname,
-        joinedAt: Date.now(),
+        joinedAt: payload.joinedAt ?? Date.now(),
         eligibleFromQuestion: 0,
       }],
       presences: [
         ...state.presences.filter(p => p.playerId !== payload.playerId),
         { playerId: payload.playerId, connected: true },
       ],
+      totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+      connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+      eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+      activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
     };
   }),
 
@@ -337,26 +378,50 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return {
         players: state.players.filter(p => p.playerId !== payload.playerId),
         presences: state.presences.filter(p => p.playerId !== payload.playerId),
+        answeredCount: payload.answeredCount ?? state.answeredCount,
+        totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+        connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+        eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+        activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
+        totalEligible: payload.activeEligiblePlayers ?? state.totalEligible,
       };
     }
     const exists = state.presences.some(p => p.playerId === payload.playerId);
     const presences = exists
       ? state.presences.map(p => p.playerId === payload.playerId ? { ...p, connected: payload.connected } : p)
       : [...state.presences, { playerId: payload.playerId, connected: payload.connected }];
-    return { presences };
+    return {
+      presences,
+      answeredCount: payload.answeredCount ?? state.answeredCount,
+      totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+      connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+      eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+      activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
+      totalEligible: payload.activeEligiblePlayers ?? state.totalEligible,
+    };
   }),
 
   handleGameStateChanged: (payload) => set((state) => {
     const isCountdown = payload.state === 'COUNTDOWN';
     const now = Date.now();
+    const phaseStartedAt = payload.phaseStartedAt ?? (isCountdown ? now : state.startedAt);
+    const phaseDeadlineAt = payload.phaseDeadlineAt ?? (isCountdown ? now + 3000 : state.deadlineAt);
     return {
       roomState: payload.state,
       roomVersion: payload.roomVersion,
       entryLocked: payload.entryLocked,
       currentQuestionIndex: payload.currentQuestionIndex,
-      countdownStartedAt: isCountdown ? now : state.countdownStartedAt,
-      startedAt: isCountdown ? now : state.startedAt,
-      deadlineAt: isCountdown ? now + 3000 : state.deadlineAt,
+      countdownStartedAt: isCountdown ? phaseStartedAt : null,
+      startedAt: phaseStartedAt,
+      deadlineAt: payload.state === 'PAUSED' ? null : phaseDeadlineAt,
+      remainingMs: payload.remainingMs ?? state.remainingMs,
+      countdownKind: payload.countdownKind ?? null,
+      answeredCount: payload.answeredCount ?? state.answeredCount,
+      totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+      connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+      eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+      activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
+      totalEligible: payload.activeEligiblePlayers ?? state.totalEligible,
     };
   }),
 
@@ -367,10 +432,16 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       currentQuestion: payload.question,
       startedAt: payload.startedAt,
       deadlineAt: payload.deadlineAt,
+      remainingMs: null,
+      countdownKind: null,
       currentQuestionIndex: payload.questionIndex,
       countdownStartedAt: null,
       answeredCount: isSameQuestion ? state.answeredCount : 0,
-      totalEligible: isSameQuestion ? state.totalEligible : 0,
+      totalEligible: payload.activeEligiblePlayers ?? (isSameQuestion ? state.totalEligible : 0),
+      totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+      connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+      eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+      activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
       // Preserve local answer state if resuming the same question (P1.3)
       selectedOptionId: isSameQuestion ? state.selectedOptionId : null,
       answerSubmitted: isSameQuestion ? state.answerSubmitted : false,
@@ -385,7 +456,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   handleRoundProgress: (payload) => set((state) => ({
     answeredCount: payload.answeredCount ?? state.answeredCount,
-    totalEligible: payload.totalEligible ?? state.totalEligible,
+    totalEligible: payload.activeEligiblePlayers ?? payload.totalEligible ?? state.totalEligible,
+    totalPlayers: payload.totalPlayers ?? state.totalPlayers,
+    connectedPlayers: payload.connectedPlayers ?? state.connectedPlayers,
+    eligiblePlayers: payload.eligiblePlayers ?? state.eligiblePlayers,
+    activeEligiblePlayers: payload.activeEligiblePlayers ?? state.activeEligiblePlayers,
     distribution: payload.distribution ?? state.distribution,
   })),
 
@@ -397,6 +472,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
   handleAnswerRejected: (payload) => set({
     answerSubmitted: false,
+    answerAcceptedAt: null,
+    selectedOptionId: null,
     answerRejected: payload,
   }),
 
@@ -446,12 +523,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     roomState: payload.isFinal ? 'PODIUM' as GameState : 'FINISHED' as GameState,
   }),
 
-  selectOption: (optionId) => set({ selectedOptionId: optionId }),
+  selectOption: (optionId) => set({
+    selectedOptionId: optionId,
+    answerRejected: null,
+  }),
 
   clearQuestionState: () => set({
     currentQuestion: null,
     startedAt: null,
     deadlineAt: null,
+    remainingMs: null,
+    countdownKind: null,
     selectedOptionId: null,
     answerSubmitted: false,
     answerAcceptedAt: null,

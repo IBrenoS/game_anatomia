@@ -85,6 +85,9 @@ export interface RoomData {
   currentQuestionIndex: number;
   createdAt: number;
   expiresAt: number;
+  phaseStartedAt: number | null;
+  phaseDeadlineAt: number | null;
+  countdownKind: 'INITIAL' | 'NEXT_QUESTION' | 'RESUME' | null;
 }
 
 export interface RoundData {
@@ -93,6 +96,7 @@ export interface RoundData {
   startedAt: number;
   deadlineAt: number;
   remainingMs: number | null;
+  accumulatedActiveMs?: number;
   endedAt: number | null;
   endReason: 'all_answered' | 'deadline' | 'host' | null;
 }
@@ -170,9 +174,6 @@ export const HostCommandType = {
   PAUSE: 'PAUSE',
   RESUME: 'RESUME',
   END_QUESTION: 'END_QUESTION',
-  SHOW_RANKING: 'SHOW_RANKING',
-  NEXT_QUESTION: 'NEXT_QUESTION',
-  START_PODIUM: 'START_PODIUM',
   END_GAME: 'END_GAME',
 } as const;
 

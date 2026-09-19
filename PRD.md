@@ -1,13 +1,13 @@
 # DOCUMENTO DE PRODUTO E ENGENHARIA
 # Batalha Anatômica — Bovino × Equino
-## Product Requirements Document (PRD) — Versão 1.2
+## Product Requirements Document (PRD) — Versão 1.5
 **Jogo multiplayer de anatomia veterinária para apresentação presencial**
 
-* **Versão:** 1.2 (Hardening Mecânico Final — Pacote Corretivo V3)
-* **Data:** 18 de setembro de 2026
-* **Status:** Especificação Canônica de Produto e Engenharia Homologada
+* **Versão:** 1.5 (Fechamento Final de Realtime, Presença e Retry)
+* **Data:** 19 de setembro de 2026
+* **Status:** Especificação canônica atual; homologações externas permanecem explicitamente pendentes quando não executadas
 * **Escopo:** MVP para uma partida efêmera com até 50 participantes simultâneos
-* **Referência Documental:** Atualização canônica integral de `PRD_Batalha_Anatomica_Engenharia.pdf` e Pacote V3
+* **Fonte Canônica:** `PRD.md`. Revisões PDF anteriores estão arquivadas em `docs/archive/` e não representam o contrato atual.
 
 ---
 
@@ -21,14 +21,32 @@ O jogo é composto por dez questões previamente configuradas, cobrindo seis mec
 
 A arquitetura adota o modelo de autoridade absoluta do servidor executando sobre **Cloudflare Workers** com **Durable Objects** (`GameRoom`), **WebSockets com Hibernation API**, **SQLite integrado ao Durable Object** para persistência efêmera em memória/disco local, e **Durable Object Alarms** para a orquestração autônoma do loop de jogo em tempo real.
 
-### Decisões Principais da Versão 1.2 (Pacote Corretivo V3 — Hardening Mecânico Final)
+### Deltas da Versão 1.5 (Realtime, Presença e Retry)
+1. **Callbacks de conexão canônica:** `webSocketClose` e `webSocketError` só alteram presença quando o `connectionId` do socket corresponde a `presence.connection_id`; callbacks tardios de conexões substituídas são ignorados.
+2. **Projeção efetiva canônica:** `getEffectivePresences` usa exclusivamente o socket cujo par `(playerId, connectionId)` corresponde à presença persistida; sockets antigos não influenciam `connected` nem `lastSeenAt`.
+3. **Heartbeat raw auto-respondido:** o frame `ping` tratado por `setWebSocketAutoResponse` não executa lógica da aplicação e, sozinho, não restaura `connected=true` após uma expiração. Enquanto a presença ainda está conectada, seu timestamp evita expiração indevida. Após expiração, a reativação determinística ocorre por mensagem autenticada que acorda o Durable Object (`REQUEST_SNAPSHOT`, `CLIENT_ALIVE`, `SUBMIT_ANSWER`) ou por `RESUME_SESSION`.
+4. **Retry após rejeição:** `ANSWER_REJECTED` remove seleção otimista inválida e confirmação pendente. Uma nova seleção durante `QUESTION_ACTIVE` limpa o erro, registra a nova alternativa e reaplica a trava otimista até aceitação ou nova rejeição.
+
+### Deltas da Versão 1.4 (Pacote Corretivo V3.2)
+1. **Reativação de Presença no Mesmo WebSocket Aberto:** Qualquer evidência válida de atividade em WebSocket autenticado de jogador (`CLIENT_ALIVE`, `REQUEST_SNAPSHOT`, `SUBMIT_ANSWER`, etc.) restaura a presença (`connected = true`) sem duplicar o jogador, preservando `playerId`, `reconnectToken`, score, respostas e elegibilidade, garantindo incremento imediato de `connectedPlayers`.
+2. **Exigência de Presença Coerente em `SUBMIT_ANSWER` (Semântica A):** O recebimento de `SUBMIT_ANSWER` em socket autenticado é reconhecido como sinal de atividade e reativa imediatamente a presença do jogador antes da validação da resposta, impedindo o estado anômalo de resposta aceita com jogador offline e assegurando coerência nos contadores canônicos (`answeredCount`, `activeEligiblePlayers`).
+3. **Rearme do Scheduler de Presença em `RESUME_SESSION`:** Qualquer operação que torna a presença ativa (`JOIN_ROOM`, `RESUME_SESSION`, reativação por socket) invoca `ensurePresenceAlarmScheduled()`, garantindo agendamento para o próximo vencimento de presença sem loops em memória ou setInterval, respeitando `phaseDeadlineAt`.
+4. **Monitoramento de Presença durante `PAUSED`:** A ação de pausa congela o relógio de gameplay (`remainingMs` preservado), mas NÃO congela a presença de rede. Durante `PAUSED`, alarmes de presença continuam operando de forma autônoma sem consumir tempo de rodada, sem disparar reveal e sem retomar o jogo.
+5. **Desacoplamento de UI entre `interactionLocked` e `hasRecordedAnswer`:** A UI do jogador separa a trava de alternativas da confirmação visual de resposta. Jogadores em rodada pausada que ainda não responderam têm botões desabilitados mas NÃO visualizam a mensagem "Resposta registrada!".
+
+### Deltas da Versão 1.3 (Pacote Corretivo V3.1)
 1. **Game Loop 100% Automático e Eliminação de Botões de Caminho Feliz:** Transições de tela entre pergunta, revelação de gabarito (5 segundos), ranking de rodada (5 segundos), contagem regressiva (3 segundos) e próxima pergunta são orquestradas autonomamente pelo servidor via alarmes de Durable Object. Botões manuais de avanço de fluxo feliz foram eliminados da interface do apresentador, mantendo apenas controles de exceção (Pausar/Retomar e Encerrar Pergunta Antecipadamente).
 2. **Início Condicionado a Presença Ativa (`connectedPlayers >= 1`):** O jogo só pode ser iniciado quando houver pelo menos 1 jogador com status `CONNECTED`. O botão de início permanece desabilitado com feedback explícito enquanto nenhum jogador estiver ativamente conectado.
-3. **Pausa Estritamente Restrita a Pergunta Ativa:** A ação de pausa (`PAUSE_GAME`) só é permitida durante `QUESTION_ACTIVE`. Tentativas de pausar em `LOBBY`, `COUNTDOWN`, `QUESTION_REVEAL` ou `ROUND_RANKING` são expressamente rejeitadas pela máquina de estados e pelo servidor com `INVALID_STATE`.
+3. **Pausa Estritamente Restrita a Pergunta Ativa:** A ação de pausa (`PAUSE`) só é permitida durante `QUESTION_ACTIVE`. Tentativas de pausar em `LOBBY`, `COUNTDOWN`, `QUESTION_REVEAL` ou `ROUND_RANKING` são expressamente rejeitadas pela máquina de estados e pelo servidor com `INVALID_STATE`.
 4. **Anti-Spoiler Total e Projeção Canônica por `canRevealAnswer`:** Snapshots e broadcasts durante `LOBBY`, `COUNTDOWN`, `QUESTION_ACTIVE` e `PAUSED` jamais incluem `correctOptionId` ou `explanation` para qualquer cliente (host, telão ou jogador). O gabarito só é exposto em estados pós-encerramento (`QUESTION_REVEAL`, `ROUND_RANKING`, `FINAL_RANKING`, `PODIUM`, `FINISHED`).
 5. **Expiração Autônoma de Presença via Alarmes de DO:** O servidor não depende de tráfego de entrada para expirar conexões silenciosas. O alarme periódico do Durable Object detecta inatividade de heartbeat (> 10s), transiciona o jogador para `TEMPORARILY_DISCONNECTED` e dispara autonomamente `checkAllAnswered()`, prevenindo travamento da rodada.
 6. **Autenticação Estrita do Host Exclusivamente via Cookie:** O `hostToken` é verificado estritamente através do cookie HttpOnly `batalha_host_${pin}`. Fallbacks por query string ou URLs de WebSocket foram totalmente removidos.
 7. **Isolamento de Sessão e Descarte de Conexões em Novas Partidas:** Ao clicar em "Nova Partida" ou "Voltar ao Início", o cliente desconecta explicitamente o WebSocket, reseta o Zustand store e limpa o estado interno do `WebSocketManager` (`seenEventIds`, `_roomVersion = 0`), garantindo que novas salas operem sem contaminação de cache.
+8. **Semântica do Scheduler/Alarm:** Um disparo de `alarm()` representa apenas a execução do próximo trabalho agendado; não representa implicitamente o deadline da pergunta. Em `QUESTION_ACTIVE`, o servidor primeiro expira presenças, reavalia `allAnswered`, encerra somente se `now >= deadlineAt` e, caso contrário, agenda `min(deadlineAt, nextPresenceExpiryAt)`.
+9. **Pausa Mecânica Restrita:** `PAUSE` permanece permitido somente em `QUESTION_ACTIVE`. Em `PAUSED`, o servidor rejeita respostas, preserva pergunta, versão, resposta já submetida, `remainingMs` e `accumulatedActiveMs`; jogador, host e telão exibem tempo congelado e estado explícito de pausa.
+10. **Snapshot Autoritativo:** `SNAPSHOT` fornece `gameState`, `phaseStartedAt`, `phaseDeadlineAt`, `currentQuestionIndex`, `question`, `questionVersion`, `remainingMs`, `countdownKind`, estado pessoal de resposta, progresso, quatro contadores canônicos, distribuição autorizada, ranking e pódio. O countdown de retomada possui deadline próprio de 3 segundos e nunca reutiliza o deadline anterior da pergunta.
+11. **Contrato Público Enxuto:** `SHOW_RANKING`, `NEXT_QUESTION`, `START_PODIUM` e `COMPLETE_GAME` não integram o protocolo público. As transições correspondentes são internas ao loop automático.
+12. **Limites de Homologação:** Testes automatizados em Chromium/WebKit não equivalem a homologação em hardware físico. Validação Android/iPhone físico e validação acadêmica humana são registradas como pendentes até evidência real.
 
 ---
 
@@ -266,6 +284,61 @@ Dispositivos móveis (Android Chrome, iOS Safari) rotineiramente suspendem o pro
 * **Detecção de Gaps:** Se um cliente receber um evento com `incomingVersion > localVersion + 1`, ele descarta o evento incremental e emite imediatamente `REQUEST_SNAPSHOT`.
 * **Idempotência:** Mensagens duplicadas recebidas com o mesmo `eventId` são descartadas.
 
+### 7.5 Contadores Canônicos
+* **`totalPlayers`:** jogadores registrados na sala e não removidos.
+* **`connectedPlayers`:** jogadores com presença viva no instante da projeção.
+* **`eligiblePlayers`:** jogadores elegíveis pelas regras da rodada, independentemente da conectividade atual.
+* **`activeEligiblePlayers`:** interseção entre jogadores elegíveis e presença viva; é o denominador autoritativo de `allAnswered`.
+* **`answeredCount`:** quantidade de jogadores `activeEligiblePlayers` que já possuem resposta na questão atual.
+
+Clientes exibem e tomam decisões funcionais a partir desses valores do servidor; `players.length` não substitui nenhum contador canônico.
+
+### 7.6 Timing Autoritativo de Fase
+Toda fase temporizada possui `phaseStartedAt` e `phaseDeadlineAt` persistidos pelo `GameRoom`. `COUNTDOWN` também informa `countdownKind` (`INITIAL`, `NEXT_QUESTION` ou `RESUME`). Durante `PAUSED`, `phaseDeadlineAt` é nulo e `remainingMs` é o valor congelado. Após um countdown `RESUME`, a mesma questão volta a `QUESTION_ACTIVE` com novo deadline calculado como `now + remainingMs`.
+
+### 7.7 Reativação de Presença no Mesmo WebSocket Aberto
+Qualquer evidência válida de atividade em WebSocket autenticado de jogador (`CLIENT_ALIVE`, `REQUEST_SNAPSHOT`, `SUBMIT_ANSWER`, etc.) aciona `markPlayerPresent(playerId, connectionId, now)`:
+* Confirma que a conexão pertence ao jogador;
+* Atualiza `presence.connected = true` e `last_seen_at = now`;
+* Mantém intactos `playerId`, `reconnectToken`, pontuação, respostas e elegibilidade;
+* Não cria registros duplicados;
+* Notifica clientes via `PLAYER_PRESENCE_CHANGED` e incrementa `connectedPlayers`;
+* Garante que o jogador volte a ser computado imediatamente como ativo sem depender exclusivamente de `RESUME_SESSION`.
+
+### 7.8 Exigência de Presença Coerente em SUBMIT_ANSWER (Semântica A)
+Antes da validação da resposta, a submissão de `SUBMIT_ANSWER` em socket autenticado é reconhecida como sinal efetivo de vida:
+* Primeiro reativa a presença do participante no servidor;
+* Em seguida processa as regras de resposta (estado da rodada, prazo, elegibilidade, opção válida);
+* Atualiza contadores canônicos (`answeredCount`, `activeEligiblePlayers`, `connectedPlayers`);
+* É terminantemente proibido o estado anômalo onde uma resposta é aceita enquanto o jogador permanece offline.
+
+### 7.9 Rearme Autônomo de Scheduler de Presença
+Toda operação que torna ou restaura presença ativa (`JOIN_ROOM`, `RESUME_SESSION`, reativação por atividade de socket) invoca `ensurePresenceAlarmScheduled()`:
+* Compatível com Hibernation API, sem loops ou timers em memória;
+* Seleciona o menor instante relevante entre o deadline da fase ativa (`phaseDeadlineAt`) e a próxima expiração de presença conectada (`lastSeenAt + PRESENCE_TIMEOUT_MS + 100`);
+* Previne que reconexões no Lobby ou em fases sem deadline deixem de monitorar silêncios subsequentes.
+
+### 7.10 Monitoramento Contínuo de Presença durante PAUSED
+O comando `PAUSE` congela exclusivamente o relógio de gameplay:
+* `remainingMs` da pergunta é preservado sem decremento;
+* `accumulatedActiveMs` é congelado;
+* Respostas novas permanecem bloqueadas;
+* A presença de rede NÃO é congelada: o alarme de presença continua agendado e, disparando em `PAUSED`, expira jogadores inativos, atualiza contadores e reagenda próximo alarme sem avançar a fase nem disparar reveal.
+
+### 7.11 Desacoplamento na UI entre interactionLocked e hasRecordedAnswer
+A interface móvel do participante desacopla duas condições fundamentais:
+* **`interactionLocked = roomState !== 'QUESTION_ACTIVE' || hasRecordedAnswer`:** bloqueia alternativas fora da janela ativa ou durante uma submissão/registro existente;
+* **`hasRecordedAnswer = answerSubmitted || Boolean((selectedOptionId || optimisticOptionId) && !answerRejected)`:** define se existe escolha pendente ou voto aceito, excluindo tentativas rejeitadas.
+Em `PAUSED` sem resposta enviada, as alternativas ficam desabilitadas exibindo o aviso "Partida pausada pelo apresentador", sem renderizar indevidamente a confirmação "Resposta registrada!" nem "Aguarde o encerramento".
+
+### 7.12 Conexão Canônica e Heartbeat Raw
+Para cada jogador, `presence.connection_id` identifica a única conexão canônica. Projeções, callbacks de fechamento e callbacks de erro devem comparar simultaneamente `playerId` e `connectionId`; uma conexão substituída nunca pode derrubar ou atualizar a presença da conexão atual.
+
+O heartbeat raw `ping` é respondido pela Hibernation API sem acordar o Durable Object. Seu timestamp pode prolongar uma presença que ainda está conectada, mas não executa escrita nem transição de aplicação. Portanto, depois que `connected=false` foi persistido, o raw heartbeat isolado não reativa a presença. `REQUEST_SNAPSHOT`, `CLIENT_ALIVE`, `SUBMIT_ANSWER` no socket canônico ou `RESUME_SESSION` constituem sinais autenticados que reativam deterministicamente a presença.
+
+### 7.13 Retry após ANSWER_REJECTED
+Ao receber `ANSWER_REJECTED`, o cliente remove `selectedOptionId`, `answerAcceptedAt` e qualquer trava otimista da tentativa rejeitada, mantendo `answerSubmitted=false`. Se a fase ainda for `QUESTION_ACTIVE`, a próxima escolha limpa `answerRejected`, define a nova alternativa e bloqueia novamente a interação durante a submissão. Ao receber `ANSWER_ACCEPTED`, a alternativa escolhida permanece registrada e `answerSubmitted=true`.
+
 ---
 
 ## 8. Segurança, Privacidade e Integridade
@@ -351,7 +424,7 @@ Dispositivos móveis (Android Chrome, iOS Safari) rotineiramente suspendem o pro
 | **NFR 09** | **Responsividade** | Interface de jogador otimizada para telas móveis verticais de 360px a 430px de largura; telão otimizado para 16:9 em 1080p. |
 | **NFR 10** | **Tolerância a Redes Instáveis** | Funcionamento estável em conexões 3G/4G/Wi-Fi com perda intermitente de pacotes e latência variável de até 300 ms. |
 | **NFR 11** | **Orçamento de Mídia** | Imagens anatômicas em formato vetorial SVG ou formatos compactos (AVIF/WebP) com peso preferencial inferior a 500 KB. |
-| **NFR 12** | **Compatibilidade de Navegadores** | Compatibilidade assegurada com Chrome, Safari (iOS 15+), Edge e Firefox em versões estáveis recentes. |
+| **NFR 12** | **Compatibilidade de Navegadores** | Fluxos automatizados devem permanecer verdes em Chromium e WebKit. Compatibilidade em Android/iPhone físico exige homologação manual separada e não pode ser inferida apenas desses testes. |
 | **NFR 13** | **Retenção e Privacidade** | Salas e dados temporários no SQLite do Durable Object purgados automaticamente em até 24 horas após o encerramento da partida. |
 | **NFR 14** | **Segurança de Credenciais** | O token administrativo do apresentador jamais trafega no corpo de respostas públicas nem em scripts de frontend. |
 | **NFR 15** | **Isolamento de Infraestrutura** | Arquitetura efêmera sem dependência de bancos relacionais externos (PostgreSQL/Supabase/Firebase) ou instâncias de Redis. |
@@ -514,18 +587,19 @@ interface EventEnvelope<TType extends string, TPayload> {
 | **Concorrência Host vs. Respostas** | FR 027, AC 14 | Teste de integração com `last_state_version` |
 | **Pódio Adaptativo e Término** | FR 031 a FR 034, AC 12, AC 15 | Testes de integração (T12, T16) e E2E completo |
 | **Segurança do Host via Cookie Estrito** | FR 001, NFR 14 | Testes de integração (T01, T17) com cookie `HttpOnly` e sem query param fallback |
-| **Descarte de Sessão / Nova Partida** | FR 034, AC 15 | Teste de integração (T13) comprovando criação de sala B e conexão sem contaminação |
-| **Escalabilidade sob 50 Conexões** | NFR 01 a NFR 04 | Script de carga real (`tests/load/websocket-load.ts`) com 12 asserções e p95 < 60ms |
+| **Descarte de Sessão / Nova Partida** | FR 034, AC 15 | E2E T25/T46: sala B recebe jogador, inicia e completa rodada real sem limpeza manual de storage |
+| **Escalabilidade sob 50 Conexões** | NFR 01 a NFR 04 | `tests/load/websocket-load.ts`: ranking esperado versus real, unicidade de eventos/transições, convergência e latência medida na execução |
 | **Acessibilidade e Usabilidade** | NFR 06 a NFR 09 | Auditoria visual, navegação por teclado e reduced-motion |
 
 ---
 
-## 16. Aprovação Formal
+## 16. Status de Validação
 
-A assinatura desta revisão confirma o alinhamento definitivo das decisões de produto, arquitetura de software, contratos de protocolo e critérios de aceitação do **Pacote Corretivo V3 — Hardening Mecânico Final**.
+Esta seção registra evidência disponível; não atribui aprovação em nome de pessoas ou equipes que não tenham assinado a revisão.
 
 | Responsabilidade | Nome do Responsável | Data | Parecer / Status |
 |---|---|---|---|
-| **Engenharia de Software** | Antigravity AI & Engenharia Fullstack | 18/09/2026 | ✅ Aprovado com 100% dos Gates Verdes |
-| **Gestão de Produto** | Equipe de Produto Batalha Anatômica | 18/09/2026 | ✅ Homologado (Versão 1.2 Canônica) |
-| **Conteúdo Acadêmico** | Docência de Anatomia Veterinária | 18/09/2026 | ✅ 10 Questões Validadas e Aprovadas |
+| **Engenharia de Software** | Execução automatizada registrada no `AUDIT_FIX_REPORT.md` | 19/09/2026 | Condicionada aos resultados efetivamente executados após a alteração final |
+| **Hardware Android** | Responsável humano a designar | — | **PHYSICAL NOT EXECUTED** |
+| **Hardware iPhone** | Responsável humano a designar | — | **PHYSICAL NOT EXECUTED** |
+| **Conteúdo Acadêmico** | Professor/equipe responsável | — | **PENDENTE DE VALIDAÇÃO ACADÊMICA** |

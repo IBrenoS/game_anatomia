@@ -48,12 +48,7 @@ export default function HostControls({ roomState }: HostControlsProps) {
     setConfirmAction(null);
   };
 
-  const players = useGameStore((s) => s.players);
-  const presences = useGameStore((s) => s.presences);
-  const connectedPlayers = players.filter(p => {
-    const pr = presences.find(pres => pres.playerId === p.playerId);
-    return pr ? pr.connected : false;
-  }).length;
+  const connectedPlayers = useGameStore((s) => s.connectedPlayers);
 
   const renderStateButtons = () => {
     switch (roomState) {

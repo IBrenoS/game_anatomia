@@ -371,4 +371,198 @@ describe('useGameStore handleSnapshot convergence across game states', () => {
     expect(state.deadlineAt).toBeTypeOf('number');
     expect(state.deadlineAt!).toBeGreaterThan(state.startedAt!);
   });
+
+  it('T35/T37: uses authoritative paused and resume timing from snapshot', () => {
+    useGameStore.getState().handleSnapshot({
+      room: {
+        pin: '123456',
+        status: 'PAUSED',
+        roomVersion: 20,
+        entryLocked: true,
+        currentQuestionIndex: 0,
+      },
+      gameState: 'PAUSED',
+      phaseStartedAt: 50_000,
+      phaseDeadlineAt: null,
+      remainingMs: 42_000,
+      question: { id: 'q1', options: [], durationMs: 60_000 },
+      questionVersion: 0,
+      answerSubmitted: true,
+      selectedOptionId: 'a',
+    });
+
+    let state = useGameStore.getState();
+    expect(state.roomState).toBe('PAUSED');
+    expect(state.remainingMs).toBe(42_000);
+    expect(state.deadlineAt).toBeNull();
+    expect(state.answerSubmitted).toBe(true);
+    expect(state.selectedOptionId).toBe('a');
+
+    useGameStore.getState().handleSnapshot({
+      room: {
+        pin: '123456',
+        status: 'COUNTDOWN',
+        roomVersion: 21,
+        entryLocked: true,
+        currentQuestionIndex: 0,
+      },
+      gameState: 'COUNTDOWN',
+      phaseStartedAt: 60_000,
+      phaseDeadlineAt: 63_000,
+      countdownKind: 'RESUME',
+      question: { id: 'q1', options: [], durationMs: 60_000 },
+      questionVersion: 0,
+      answerSubmitted: true,
+      selectedOptionId: 'a',
+    });
+
+    state = useGameStore.getState();
+    expect(state.startedAt).toBe(60_000);
+    expect(state.deadlineAt).toBe(63_000);
+    expect(state.countdownKind).toBe('RESUME');
+  });
+
+  it('T38/T39/T40: restores authoritative progress counters and distribution', () => {
+    useGameStore.getState().handleSnapshot({
+      room: {
+        pin: '123456',
+        status: 'QUESTION_ACTIVE',
+        roomVersion: 30,
+        entryLocked: true,
+        currentQuestionIndex: 0,
+      },
+      gameState: 'QUESTION_ACTIVE',
+      phaseStartedAt: 100_000,
+      phaseDeadlineAt: 160_000,
+      question: { id: 'q1', options: [{ id: 'a', label: 'A' }], durationMs: 60_000 },
+      answeredCount: 7,
+      totalPlayers: 15,
+      connectedPlayers: 12,
+      eligiblePlayers: 10,
+      activeEligiblePlayers: 9,
+      distribution: [{ optionId: 'a', count: 7, percentage: 100 }],
+    });
+
+    const state = useGameStore.getState();
+    expect(state.answeredCount).toBe(7);
+    expect(state.totalPlayers).toBe(15);
+    expect(state.connectedPlayers).toBe(12);
+    expect(state.eligiblePlayers).toBe(10);
+    expect(state.activeEligiblePlayers).toBe(9);
+    expect(state.distribution).toEqual([{ optionId: 'a', count: 7, percentage: 100 }]);
+  });
+
+  it('permite retry limpo após ANSWER_REJECTED e preserva a nova alternativa aceita', () => {
+    useGameStore.setState({
+      roomState: 'QUESTION_ACTIVE',
+      selectedOptionId: 'opt-a',
+      answerSubmitted: false,
+      answerAcceptedAt: null,
+      answerRejected: null,
+    });
+
+    useGameStore.getState().handleAnswerRejected({ code: 'INVALID_PAYLOAD', message: 'Resposta rejeitada' });
+    let state = useGameStore.getState();
+    expect(state.answerSubmitted).toBe(false);
+    expect(state.selectedOptionId).toBeNull();
+    expect(state.answerAcceptedAt).toBeNull();
+    expect(state.answerRejected?.code).toBe('INVALID_PAYLOAD');
+
+    useGameStore.getState().selectOption('opt-b');
+    state = useGameStore.getState();
+    expect(state.answerRejected).toBeNull();
+    expect(state.selectedOptionId).toBe('opt-b');
+
+    useGameStore.getState().handleAnswerAccepted({ receivedAt: 123_456 });
+    state = useGameStore.getState();
+    expect(state.answerSubmitted).toBe(true);
+    expect(state.selectedOptionId).toBe('opt-b');
+    expect(state.answerRejected).toBeNull();
+  });
+
+  describe('V32-T05: PAUSED e RESUME semântica de interactionLocked vs hasRecordedAnswer', () => {
+    it('V32-T05A: PAUSED sem resposta mantem answerSubmitted=false e selectedOptionId=null', () => {
+      useGameStore.getState().handleSnapshot({
+        room: { pin: '123456', status: 'PAUSED', roomVersion: 10, entryLocked: true, currentQuestionIndex: 0 },
+        gameState: 'PAUSED',
+        remainingMs: 45000,
+        question: { id: 'q1', options: [{ id: 'a', label: 'A' }], durationMs: 60000 },
+        questionVersion: 0,
+        answerSubmitted: false,
+        selectedOptionId: null,
+      });
+
+      const state = useGameStore.getState();
+      expect(state.roomState).toBe('PAUSED');
+      expect(state.answerSubmitted).toBe(false);
+      expect(state.selectedOptionId).toBeNull();
+      // UI semantics:
+      const hasRecordedAnswer = Boolean(state.answerSubmitted || state.selectedOptionId);
+      const interactionLocked = Boolean(state.roomState === 'PAUSED' || hasRecordedAnswer);
+      expect(hasRecordedAnswer).toBe(false); // NO "Resposta registrada!"
+      expect(interactionLocked).toBe(true);  // Buttons disabled
+    });
+
+    it('V32-T05B: PAUSED após resposta preserva answerSubmitted=true e selectedOptionId', () => {
+      useGameStore.getState().handleSnapshot({
+        room: { pin: '123456', status: 'PAUSED', roomVersion: 11, entryLocked: true, currentQuestionIndex: 0 },
+        gameState: 'PAUSED',
+        remainingMs: 45000,
+        question: { id: 'q1', options: [{ id: 'a', label: 'A' }], durationMs: 60000 },
+        questionVersion: 0,
+        answerSubmitted: true,
+        selectedOptionId: 'a',
+      });
+
+      const state = useGameStore.getState();
+      expect(state.roomState).toBe('PAUSED');
+      expect(state.answerSubmitted).toBe(true);
+      expect(state.selectedOptionId).toBe('a');
+      // UI semantics:
+      const hasRecordedAnswer = Boolean(state.answerSubmitted || state.selectedOptionId);
+      const interactionLocked = Boolean(state.roomState === 'PAUSED' || hasRecordedAnswer);
+      expect(hasRecordedAnswer).toBe(true); // "Resposta registrada!" shown
+      expect(interactionLocked).toBe(true); // Buttons disabled
+    });
+
+    it('V32-T05C: RESUME para jogador não respondeu libera alternativas', () => {
+      useGameStore.getState().handleSnapshot({
+        room: { pin: '123456', status: 'QUESTION_ACTIVE', roomVersion: 15, entryLocked: true, currentQuestionIndex: 0 },
+        gameState: 'QUESTION_ACTIVE',
+        phaseStartedAt: 100000,
+        phaseDeadlineAt: 145000,
+        question: { id: 'q1', options: [{ id: 'a', label: 'A' }], durationMs: 60000 },
+        questionVersion: 0,
+        answerSubmitted: false,
+        selectedOptionId: null,
+      });
+
+      const state = useGameStore.getState();
+      expect(state.roomState).toBe('QUESTION_ACTIVE');
+      const hasRecordedAnswer = Boolean(state.answerSubmitted || state.selectedOptionId);
+      const interactionLocked = Boolean(state.roomState === 'PAUSED' || hasRecordedAnswer);
+      expect(hasRecordedAnswer).toBe(false);
+      expect(interactionLocked).toBe(false); // Alternatives enabled!
+    });
+
+    it('V32-T05D: RESUME para jogador que já respondeu mantém alternativas bloqueadas e confirmação visível', () => {
+      useGameStore.getState().handleSnapshot({
+        room: { pin: '123456', status: 'QUESTION_ACTIVE', roomVersion: 15, entryLocked: true, currentQuestionIndex: 0 },
+        gameState: 'QUESTION_ACTIVE',
+        phaseStartedAt: 100000,
+        phaseDeadlineAt: 145000,
+        question: { id: 'q1', options: [{ id: 'a', label: 'A' }], durationMs: 60000 },
+        questionVersion: 0,
+        answerSubmitted: true,
+        selectedOptionId: 'a',
+      });
+
+      const state = useGameStore.getState();
+      expect(state.roomState).toBe('QUESTION_ACTIVE');
+      const hasRecordedAnswer = Boolean(state.answerSubmitted || state.selectedOptionId);
+      const interactionLocked = Boolean(state.roomState === 'PAUSED' || hasRecordedAnswer);
+      expect(hasRecordedAnswer).toBe(true);  // Confirmation remains visible
+      expect(interactionLocked).toBe(true);  // Alternatives remain locked
+    });
+  });
 });

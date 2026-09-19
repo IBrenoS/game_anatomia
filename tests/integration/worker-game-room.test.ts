@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GameRoom } from '../../apps/web/worker/game-room';
 import worker from '../../apps/web/worker/index';
 import {
@@ -36,7 +36,13 @@ function attachTestClient(room: GameRoom, serverWs: MockWebSocket, clientWs: Moc
       return msgs.length > 0 ? JSON.parse(msgs[msgs.length - 1]) : null;
     },
     getAllMessages: () => {
-      return serverWs.sentMessages.map(m => JSON.parse(m));
+      return serverWs.sentMessages.flatMap(message => {
+        try {
+          return [JSON.parse(message)];
+        } catch {
+          return [];
+        }
+      });
     },
     clearMessages: () => {
       serverWs.sentMessages = [];
@@ -72,6 +78,42 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
     const res = await room.fetch(initReq);
     expect(res.status).toBe(201);
   });
+
+  async function runNextAlarm(): Promise<void> {
+    const scheduledAt = (room as any).room?.phaseDeadlineAt ?? ctx.getAlarm();
+    expect(scheduledAt).not.toBeNull();
+    for (const socket of ctx.getWebSockets('role:player')) {
+      ctx.simulateWebSocketMessage(socket, 'ping', scheduledAt!);
+    }
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(scheduledAt!);
+    try {
+      await room.alarm();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
+  async function runScheduledAlarmWithoutHeartbeat(): Promise<void> {
+    const scheduledAt = ctx.getAlarm();
+    expect(scheduledAt).not.toBeNull();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(scheduledAt!);
+    try {
+      await room.alarm();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
+
+  async function runPhaseAlarmWithoutHeartbeat(): Promise<void> {
+    const scheduledAt = (room as any).room?.phaseDeadlineAt;
+    expect(scheduledAt).not.toBeNull();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(scheduledAt!);
+    try {
+      await room.alarm();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  }
 
   describe('Worker HTTP API & Security (P1.8, P1.9)', () => {
     it('creates room with PIN, hostToken, joinUrl, and HttpOnly cookie', async () => {
@@ -398,7 +440,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       Date.now = () => heartbeatAt;
       try {
         await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-        await room.alarm();
+        await runNextAlarm();
 
         const question = questions[0];
         await playerClient.send(createClientEnvelope('SUBMIT_ANSWER', {
@@ -443,7 +485,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       // Start game: LOBBY -> COUNTDOWN -> QUESTION_ACTIVE
       await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
       // Trigger alarm to finish COUNTDOWN and start Question 1
-      await room.alarm();
+      await runNextAlarm();
       aliceClient.clearMessages();
       bobClient.clearMessages();
     });
@@ -540,10 +582,10 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         optionId: q1.correctOptionId,
       }, 0));
 
-      // Host advances to Question 1 (index 1)
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Question index 1 is now active!
+      // Automatic loop advances reveal -> ranking -> countdown.
+      await runNextAlarm();
+      await runNextAlarm();
+      await runNextAlarm(); // Question index 1 is now active!
 
       const q2 = questions[1];
       const initialVersion = (room as any).room.roomVersion;
@@ -610,7 +652,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await aliceClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
 
       await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
-      await room.alarm(); // Start Question 1
+      await runNextAlarm(); // Start Question 1
       aliceClient.clearMessages();
     });
 
@@ -633,7 +675,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // 3. Host resumes game
       await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 4));
-      await room.alarm(); // Finishes resume countdown and reactivates question
+      await runNextAlarm(); // Finishes resume countdown and reactivates question
 
       // 4. Submit answer after resume -> accepted
       aliceClient.clearMessages();
@@ -675,7 +717,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         // 4. Host resumes
         await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 4));
         mockNow += 3000;
-        await room.alarm(); // Resume countdown ends
+        await runNextAlarm(); // Resume countdown ends
 
         // 5. Player responds after 3 more seconds of active time (total active = 4s + 3s = 7s <= 10s bonus)
         mockNow += 3000;
@@ -717,7 +759,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // Start game
       await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
-      await room.alarm(); // starts Question 0 (Q1)
+      await runNextAlarm(); // starts Question 0 (Q1)
 
       // Play questions 0 through 8 (Q1 to Q9)
       for (let qIndex = 0; qIndex < 9; qIndex++) {
@@ -729,12 +771,10 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
           optionId: q.correctOptionId,
         }, 0));
 
-        // Host shows ranking -> transitions to ROUND_RANKING for Q1–Q9
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-
-        // Host advances to next question
-        await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'NEXT_QUESTION', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-        await room.alarm(); // Countdown alarm -> starts next question
+        // Automatic loop: reveal -> ranking -> countdown -> next question.
+        await runNextAlarm();
+        await runNextAlarm();
+        await runNextAlarm(); // Countdown alarm -> starts next question
       }
 
       // Now at Question index 9 (the 10th and final question!)
@@ -748,9 +788,9 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         optionId: q10.correctOptionId,
       }, 0));
 
-      // On Question 10, SHOW_RANKING must transition directly to FINAL_RANKING
+      // On Question 10, the automatic reveal transition goes directly to FINAL_RANKING.
       hostClient.clearMessages();
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'SHOW_RANKING', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await runNextAlarm();
 
       const rankEvent = hostClient.getAllMessages().find(m => m.type === ServerEventType.RANKING_UPDATED);
       expect(rankEvent).toBeDefined();
@@ -763,7 +803,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // From FINAL_RANKING to PODIUM
       hostClient.clearMessages();
-      await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_PODIUM', expectedRoomVersion: (room as any).room.roomVersion }, 0));
+      await runNextAlarm();
       const stateChange2 = hostClient.getAllMessages().find(
         m => m.type === ServerEventType.GAME_STATE_CHANGED && m.payload.state === GameState.PODIUM
       );
@@ -796,7 +836,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((room as any).room.status).toBe(GameState.FINISHED);
 
       // Trigger cleanup alarm
-      await room.alarm();
+      await runNextAlarm();
 
       // Verify all tables were wiped
       const sql = (room as any).sql;
@@ -835,7 +875,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((room as any).room.status).toBe(GameState.COUNTDOWN);
 
       // Countdown finishes -> QUESTION_ACTIVE (Q1)
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
       expect((room as any).room.currentQuestionIndex).toBe(0);
 
@@ -857,15 +897,15 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
 
       // Automated Reveal alarm (5s) -> ROUND_RANKING (WITHOUT HOST ACTION!)
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.ROUND_RANKING);
 
       // Automated Ranking alarm (5s) -> COUNTDOWN (3s) (WITHOUT HOST ACTION!)
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.COUNTDOWN);
 
       // Automated Countdown alarm (3s) -> QUESTION_ACTIVE (Q2)
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
       expect((room as any).room.currentQuestionIndex).toBe(1);
     });
@@ -894,7 +934,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       }
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
       hostTestClient.clearMessages();
       screenTestClient.clearMessages();
@@ -943,11 +983,17 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'SlowPlayer' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
-      // Player does NOT answer. Deadline alarm fires!
+      // Player does NOT answer. Move the persisted deadline into the past,
+      // then execute the alarm that Cloudflare would deliver for that deadline.
       pClient.clearMessages();
-      await room.alarm(); // fires endCurrentQuestion('deadline')
+      (room as any).sql.exec(
+        'UPDATE rounds SET deadline_at = ? WHERE question_id = ?',
+        Date.now() - 1,
+        questions[0].id
+      );
+      await runNextAlarm(); // fires endCurrentQuestion('deadline')
 
       expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
       const reveal = pClient.getAllMessages().find(m => m.type === ServerEventType.ANSWER_REVEAL);
@@ -977,7 +1023,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const joaoPlayerId = p2.getAllMessages().find(m => m.type === ServerEventType.SESSION_ACCEPTED).payload.playerId;
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runPhaseAlarmWithoutHeartbeat(); // Q1 active
 
       // Alice answers first
       const q1 = questions[0];
@@ -1021,7 +1067,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Joao' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runPhaseAlarmWithoutHeartbeat(); // Q1 active
 
       // João closes browser cleanly
       await room.webSocketClose(p2Ws as any, 1000, 'Browser closed');
@@ -1058,7 +1104,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
       // Alice answers
       const q1 = questions[0];
@@ -1075,7 +1121,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       // Host resumes -> COUNTDOWN
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'RESUME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       expect((room as any).room.status).toBe(GameState.COUNTDOWN);
-      await room.alarm(); // resumes QUESTION_ACTIVE
+      await runNextAlarm(); // resumes QUESTION_ACTIVE
 
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
 
@@ -1114,7 +1160,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p2.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
       // Host saw roomVersion at start of Q1
       const hostKnownVersion = (room as any).room.roomVersion;
@@ -1153,7 +1199,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 (index 0)
+      await runNextAlarm(); // Q1 (index 0)
 
       // 1. Future questionVersion (9999) -> rejected with INVALID_PAYLOAD
       p1.clearMessages();
@@ -1188,7 +1234,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p1.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'SoloHero' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
       // Play questions 0 through 8 (Q1 to Q9)
       for (let i = 0; i < 9; i++) {
@@ -1200,11 +1246,11 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
           optionId: questions[i].correctOptionId,
         }, 0));
         expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
-        await room.alarm(); // -> ROUND_RANKING
+        await runNextAlarm(); // -> ROUND_RANKING
         expect((room as any).room.status).toBe(GameState.ROUND_RANKING);
-        await room.alarm(); // -> COUNTDOWN
+        await runNextAlarm(); // -> COUNTDOWN
         expect((room as any).room.status).toBe(GameState.COUNTDOWN);
-        await room.alarm(); // -> next QUESTION_ACTIVE
+        await runNextAlarm(); // -> next QUESTION_ACTIVE
       }
 
       // Q10
@@ -1218,15 +1264,15 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
 
       // Automated transition: QUESTION_REVEAL -> FINAL_RANKING
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.FINAL_RANKING);
 
       // Automated transition: FINAL_RANKING -> PODIUM
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.PODIUM);
 
       // Automated transition: PODIUM -> FINISHED
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.FINISHED);
     });
 
@@ -1406,7 +1452,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
 
       // Start game -> advance to QUESTION_ACTIVE
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runPhaseAlarmWithoutHeartbeat(); // Q1 active
 
       hostTestClient.clearMessages();
       screenTestClient.clearMessages();
@@ -1466,7 +1512,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const p2Id = p2Session.payload.playerId;
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runPhaseAlarmWithoutHeartbeat(); // Q1 active
 
       // Alice answers
       const q1 = questions[0];
@@ -1484,7 +1530,10 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       ctx.sockets.delete(p2Ws);
 
       // Trigger DO alarm (multiplexed phase timer + presence check)
-      await room.alarm();
+      const presenceAlarmAt = ctx.getAlarm();
+      expect(presenceAlarmAt).not.toBeNull();
+      ctx.simulateWebSocketMessage(p1Ws, 'ping', presenceAlarmAt!);
+      await runScheduledAlarmWithoutHeartbeat();
 
       // Alice answered and was the only active player left, so round ended autonomously!
       expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
@@ -1509,7 +1558,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p2Client.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'BobClean' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runNextAlarm(); // Q1 active
 
       // Alice answers
       const q1 = questions[0];
@@ -1545,7 +1594,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await p2Client.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Bob' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // Q1 active
+      await runNextAlarm(); // Q1 active
 
       const q1 = questions[0];
       // Alice answers
@@ -1582,7 +1631,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((room as any).room.status).toBe(GameState.COUNTDOWN);
 
       // Alarm fires after resume countdown -> returns to QUESTION_ACTIVE on same question
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
       expect((room as any).room.currentQuestionIndex).toBe(0);
 
@@ -1695,7 +1744,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await pClient.send(createClientEnvelope('JOIN_ROOM', { pin: testPin, nickname: 'Alice' }, 0));
 
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
-      await room.alarm(); // start Q1
+      await runNextAlarm(); // start Q1
 
       // Host pauses, then resumes -> enters COUNTDOWN
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'PAUSE', expectedRoomVersion: (room as any).room.roomVersion }, 0));
@@ -1713,7 +1762,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect(countdownSnap.payload.distribution).toEqual([]);
 
       // Advance countdown to active question
-      await room.alarm();
+      await runNextAlarm();
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
 
       // Alice answers -> ends question into QUESTION_REVEAL

@@ -5,8 +5,8 @@ interface PlayerLobbyProps {
 }
 
 export default function PlayerLobby({ nickname }: PlayerLobbyProps) {
-  const players = useGameStore((s) => s.players);
-  const playerCount = players.length || 1;
+  const authoritativeTotal = useGameStore((s) => s.totalPlayers);
+  const playerCount = authoritativeTotal || 1;
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center text-white text-center select-none p-4">

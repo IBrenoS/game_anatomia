@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PublicQuestion } from '@batalha/protocol';
 import { wsManager } from '../../lib/ws.js';
 import { useGameStore } from '../../stores/gameStore.js';
@@ -12,6 +12,9 @@ interface PlayerQuestionProps {
   deadlineAt: number | null;
   selectedOptionId: string | null;
   answerSubmitted: boolean;
+  roomState?: import('@batalha/protocol').GameState | null;
+  remainingMs?: number | null;
+  answerRejected?: { code: string; message: string } | null;
 }
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
@@ -28,21 +31,50 @@ export default function PlayerQuestion({
   startedAt,
   deadlineAt,
   selectedOptionId, 
-  answerSubmitted 
+  answerSubmitted,
+  roomState: propRoomState,
+  remainingMs: propRemainingMs,
+  answerRejected: propAnswerRejected,
 }: PlayerQuestionProps) {
   const [optimisticOptionId, setOptimisticOptionId] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   
   const selectOption = useGameStore((s) => s.selectOption);
-  const answerRejected = useGameStore((s) => s.answerRejected);
+  const storeAnswerRejected = useGameStore((s) => s.answerRejected);
+  const storeRoomState = useGameStore((s) => s.roomState);
+  const storeRemainingMs = useGameStore((s) => s.remainingMs);
+
+  const roomState = propRoomState !== undefined ? propRoomState : storeRoomState;
+  const remainingMs = propRemainingMs !== undefined ? propRemainingMs : storeRemainingMs;
+  const answerRejected = propAnswerRejected !== undefined ? propAnswerRejected : storeAnswerRejected;
+
+  useEffect(() => {
+    if (answerRejected) {
+      setOptimisticOptionId(null);
+    }
+  }, [answerRejected]);
+
+  useEffect(() => {
+    setOptimisticOptionId(null);
+  }, [question?.id]);
+
+  useEffect(() => {
+    if (answerSubmitted) {
+      setOptimisticOptionId(null);
+    }
+  }, [answerSubmitted]);
 
   if (!question) return <div className="text-white text-center py-12">Carregando pergunta...</div>;
 
-  const currentSelection = selectedOptionId || optimisticOptionId;
-  const isLocked = Boolean(answerSubmitted || optimisticOptionId);
+  const currentSelection = selectedOptionId || (answerRejected ? null : optimisticOptionId);
+  const isPaused = roomState === 'PAUSED';
+  const hasRecordedAnswer = Boolean(
+    answerSubmitted || ((selectedOptionId || optimisticOptionId) && !answerRejected)
+  );
+  const interactionLocked = roomState !== 'QUESTION_ACTIVE' || hasRecordedAnswer;
 
   const handleSelectOption = (optionId: string) => {
-    if (isLocked) return;
+    if (interactionLocked) return;
     
     // Immediate optimistic lock and audio feedback
     setOptimisticOptionId(optionId);
@@ -77,7 +109,7 @@ export default function PlayerQuestion({
         </div>
 
         {/* Dynamic Countdown Bar */}
-        <CountdownTimer deadlineAt={deadlineAt} startedAt={startedAt} />
+        <CountdownTimer deadlineAt={deadlineAt} startedAt={startedAt} paused={isPaused} remainingMs={remainingMs} />
 
         {/* Prompt */}
         <h2 className="text-base sm:text-lg font-bold text-white mt-2 mb-2 leading-snug">
@@ -99,8 +131,15 @@ export default function PlayerQuestion({
         )}
       </div>
 
+      {isPaused && (
+        <div role="status" className="bg-amber-950/80 border border-amber-400/50 rounded-2xl p-3 text-center shadow-lg my-1.5">
+          <p className="font-black text-amber-100">Partida pausada pelo apresentador</p>
+          <p className="text-xs text-amber-200 mt-0.5">Rodada pausada. As alternativas serão liberadas quando o apresentador retomar.</p>
+        </div>
+      )}
+
       {/* Answer Confirmation / Status Banner (Neutral - No premature spoilers) */}
-      {isLocked && (
+      {hasRecordedAnswer && (
         <div className="bg-blue-950/80 border border-blue-400/40 rounded-2xl p-3 text-center shadow-lg my-1.5 animate-[fadeIn_0.25s_ease-out] motion-reduce:animate-none">
           <div className="flex items-center justify-center gap-2 text-blue-100 font-bold text-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-ping motion-reduce:animate-none" />
@@ -133,11 +172,11 @@ export default function PlayerQuestion({
               key={option.id}
               type="button"
               onClick={() => handleSelectOption(option.id)}
-              disabled={isLocked}
+              disabled={interactionLocked}
               className={`${colorClass} ${
                 isSelected 
                   ? 'ring-4 ring-white scale-[1.02] shadow-2xl brightness-110' 
-                  : isLocked 
+                  : interactionLocked
                   ? 'opacity-50 cursor-default' 
                   : 'cursor-pointer active:scale-98'
               } text-white min-h-[50px] sm:min-h-[56px] p-3 sm:p-3.5 rounded-2xl text-left font-bold shadow-md transition-all flex items-center gap-3 border-b-4 border-black/30`}

@@ -1,4 +1,5 @@
 import QrPanel from './QrPanel.js';
+import { useGameStore } from '../../stores/gameStore.js';
 
 interface ScreenLobbyProps {
   players: Array<{ playerId: string; nickname: string; joinedAt: number }>;
@@ -8,6 +9,7 @@ interface ScreenLobbyProps {
 
 export default function ScreenLobby({ players, presences, pin }: ScreenLobbyProps) {
   const hostUrl = typeof window !== 'undefined' ? `${window.location.host}/join/${pin}` : `sala ${pin}`;
+  const totalPlayers = useGameStore((state) => state.totalPlayers);
 
   return (
     <div className="flex flex-col h-full text-white p-8 md:p-12 max-w-7xl mx-auto w-full justify-between select-none">
@@ -65,7 +67,7 @@ export default function ScreenLobby({ players, presences, pin }: ScreenLobbyProp
             </h2>
           </div>
           <span className="text-lg md:text-xl font-black bg-blue-600/50 px-4 py-1 rounded-full border border-blue-400/30 text-yellow-300">
-            {players.length} / 50
+            {totalPlayers} / 50
           </span>
         </div>
 

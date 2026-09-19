@@ -87,6 +87,11 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
     await expect(playerPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
 
+    const screenContext = await browser.newContext();
+    const screenPage = await screenContext.newPage();
+    await screenPage.goto(`/screen/${pin}`);
+    await expect(screenPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10000 });
+
     // 4. Host pauses round
     const pauseBtn = hostPage.getByRole('button', { name: /pausar rodada/i });
     await expect(pauseBtn).toBeVisible({ timeout: 5000 });
@@ -96,6 +101,16 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const resumeBtn = hostPage.getByRole('button', { name: /retomar rodada/i });
     await expect(resumeBtn).toBeVisible({ timeout: 5000 });
 
+    // T34/T35: pause is mechanical in all frontends, not only rejected server-side.
+    await expect(playerPage.getByRole('status').filter({ hasText: /rodada pausada/i })).toBeVisible();
+    const answerButtons = playerPage.getByRole('button', { name: /alternativa/i });
+    await expect(answerButtons.first()).toBeDisabled();
+    await expect(hostPage.getByRole('status').filter({ hasText: /cronômetro congelado/i })).toBeVisible();
+    await expect(screenPage.getByRole('status').filter({ hasText: /cronômetro congelado/i })).toBeVisible();
+    const frozenTimer = await playerPage.getByLabel(/tempo restante/i).textContent();
+    await playerPage.waitForTimeout(1200);
+    await expect(playerPage.getByLabel(/tempo restante/i)).toHaveText(frozenTimer ?? '');
+
     // 5. Host resumes round
     await resumeBtn.click();
 
@@ -104,6 +119,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     await hostContext.close();
     await playerContext.close();
+    await screenContext.close();
   });
 
   test('Scenario 4: Remoção de participante pelo apresentador', async ({ browser }) => {
@@ -154,7 +170,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await p2Context.close();
   });
 
-  test('Scenario 5: Reload de página durante questão ativa antes e após responder', async ({ browser }) => {
+  test('T39/T40: reload/foreground durante questão restaura resposta do jogador e progresso/distribuição do host', async ({ browser }) => {
     // 1. Host creates room
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
@@ -192,6 +208,16 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     // 5. Submit answer -> answer registered
     await optA.click();
     await expect(alicePage.getByText(/resposta registrada|resposta incorreta|você acertou/i)).toBeVisible({ timeout: 5000 });
+
+    // Host projection is authoritative after refresh and foreground sync.
+    await expect(hostPage.getByText(/1 \/ 2 jogadores ativos responderam/i)).toBeVisible({ timeout: 5000 });
+    await expect(hostPage.getByText('1 voto')).toBeVisible();
+    await hostPage.reload();
+    await expect(hostPage.getByText(/1 \/ 2 jogadores ativos responderam/i)).toBeVisible({ timeout: 10000 });
+    await expect(hostPage.getByText('1 voto')).toBeVisible();
+    await hostPage.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(hostPage.getByText(/1 \/ 2 jogadores ativos responderam/i)).toBeVisible({ timeout: 5000 });
+    await expect(hostPage.getByText('1 voto')).toBeVisible();
 
     // 6. Reload AFTER answering -> should preserve answer state and NOT allow second answer
     await alicePage.reload();
@@ -286,7 +312,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     }
   });
 
-  test('Scenario 8 (T13/T25): Partida A FINISHED -> Nova Partida -> Sala B funcional em tempo real sem limpar cache/storage', async ({ browser }) => {
+  test('T25/T46: Partida A FINISHED -> Nova Partida -> sala B inicia e completa uma rodada real sem limpar cache/storage', async ({ browser }) => {
     // 1. Host creates Room A
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
@@ -345,6 +371,14 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     // Host sees PlayerB in real-time in Room B lobby without refresh
     await expect(hostPage.getByText('PlayerB')).toBeVisible({ timeout: 8000 });
+
+    // 5. Room B starts and completes one real question through the automatic loop.
+    await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
+    await expect(p2Page.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await p2Page.getByRole('button', { name: /alternativa a:/i }).click();
+    await expect(p2Page.getByText(/resposta registrada/i)).toBeVisible({ timeout: 5000 });
+    await expect(p2Page.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 10000 });
+    await expect(hostPage.getByText(/classificação da rodada/i)).toBeVisible({ timeout: 10000 });
 
     await hostContext.close();
     await p1Context.close();

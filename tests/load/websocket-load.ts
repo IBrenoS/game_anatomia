@@ -1,10 +1,11 @@
-import { spawn, ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, ChildProcess } from 'node:child_process';
 import {
   ClientEventType,
   ServerEventType,
   createClientEnvelope,
   EventEnvelope,
 } from '../../packages/protocol/src/index';
+import { questions } from '../../packages/content/src/index';
 
 export interface LoadTestConfig {
   baseUrl: string;
@@ -56,8 +57,14 @@ async function ensureServerRunning(baseUrl: string): Promise<ChildProcess | null
   }
 
   console.log(`[Load Test] Server not running on ${baseUrl}. Spawning dev server...`);
-  const child = spawn('pnpm', ['dev'], {
-    shell: true,
+  const pnpmCliPath = process.env.npm_execpath;
+  if (!pnpmCliPath) {
+    throw new Error(
+      'Unable to locate the pnpm CLI. Run the load test through "pnpm test:load".'
+    );
+  }
+
+  const child = spawn(process.execPath, [pnpmCliPath, 'dev'], {
     stdio: 'ignore',
     cwd: process.cwd(),
   });
@@ -132,6 +139,10 @@ export async function runWebSocketLoadTest(
     const questionRevealPromise = new Promise<any>(resolve => {
       questionRevealPromiseResolve = resolve;
     });
+    let rankingPromiseResolve: (ranking: any) => void;
+    const rankingPromise = new Promise<any>(resolve => {
+      rankingPromiseResolve = resolve;
+    });
 
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Host WS timeout')), 10000);
@@ -145,8 +156,10 @@ export async function runWebSocketLoadTest(
             resolve();
           } else if (env.type === ServerEventType.QUESTION_STARTED) {
             questionActivePromiseResolve(env.payload);
-          } else if (env.type === ServerEventType.ANSWER_REVEAL || env.type === ServerEventType.QUESTION_ENDED) {
+          } else if (env.type === ServerEventType.ANSWER_REVEAL) {
             questionRevealPromiseResolve(env.payload);
+          } else if (env.type === ServerEventType.RANKING_UPDATED) {
+            rankingPromiseResolve(env.payload);
           }
         } catch {
           // ignore
@@ -162,12 +175,14 @@ export async function runWebSocketLoadTest(
     // 3. Connect 2 Screen WebSockets
     console.log(`[Load Test] Connecting ${config.screenCount} Screen WebSockets...`);
     const screenSockets: WebSocket[] = [];
-    const screenEvents: any[] = [];
+    const screenEventStreams: any[][] = [];
     for (let s = 1; s <= config.screenCount; s++) {
       const screenWsUrl = `${wsOrigin}/api/rooms/${pin}/ws?role=screen`;
       const screenWs = new WebSocket(screenWsUrl);
       allSockets.push(screenWs);
       screenSockets.push(screenWs);
+      const screenEvents: any[] = [];
+      screenEventStreams.push(screenEvents);
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error(`Screen ${s} WS timeout`)), 10000);
@@ -202,10 +217,15 @@ export async function runWebSocketLoadTest(
       currentQuestion: any;
       latencyMs: number;
       answerAccepted: boolean;
+      chosenOptionId: string;
+      acceptedAt: number | null;
+      joinedAt: number;
+      joinOrder: number;
     }
 
     const playerSessions: PlayerSession[] = [];
     const playerConnectPromises = Array.from({ length: config.playerCount }, async (_, i) => {
+      await delay(i * 15);
       const playerIndex = i + 1;
       const nickname = `Competidor_${String(playerIndex).padStart(2, '0')}`;
       const playerWsUrl = `${wsOrigin}/api/rooms/${pin}/ws?role=player`;
@@ -221,6 +241,10 @@ export async function runWebSocketLoadTest(
         currentQuestion: null,
         latencyMs: 0,
         answerAccepted: false,
+        chosenOptionId: '',
+        acceptedAt: null,
+        joinedAt: 0,
+        joinOrder: 0,
       };
       playerSessions.push(session);
 
@@ -247,14 +271,21 @@ export async function runWebSocketLoadTest(
           }
         };
 
-        pWs.onerror = (err) => {
+        pWs.onerror = (err: any) => {
           clearTimeout(timeout);
-          reject(err);
+          reject(new Error(`Player ${nickname} WS error: ${err.message || err.error?.message || err.type || String(err)}`));
         };
       });
     });
 
     await Promise.all(playerConnectPromises);
+    const joinedEvents = hostEvents.filter(event => event.type === ServerEventType.PLAYER_JOINED);
+    for (const session of playerSessions) {
+      const eventIndex = joinedEvents.findIndex(event => event.payload.playerId === session.playerId);
+      const joinedEvent = joinedEvents[eventIndex];
+      session.joinedAt = joinedEvent?.payload.joinedAt ?? 0;
+      session.joinOrder = eventIndex;
+    }
     console.log(`[Load Test] Successfully connected and enrolled all ${config.playerCount} players in room lobby!`);
 
     // 5. Host starts the game
@@ -284,8 +315,15 @@ export async function runWebSocketLoadTest(
       const jitterMs = Math.floor(Math.random() * config.burstDurationMs);
       await delay(jitterMs);
 
-      // Select option
-      const chosenOption = activeQuestion.options[session.index % activeQuestion.options.length];
+      // Deterministic fixture: even players answer correctly; odd players
+      // choose the first known-wrong option.
+      const canonicalQuestion = questions[0];
+      const wrongOption = activeQuestion.options.find((option: any) => option.id !== canonicalQuestion.correctOptionId);
+      const chosenOption = session.index % 2 === 0
+        ? activeQuestion.options.find((option: any) => option.id === canonicalQuestion.correctOptionId)
+        : wrongOption;
+      if (!chosenOption) throw new Error('Load fixture could not resolve a deterministic option');
+      session.chosenOptionId = chosenOption.id;
       const sendTime = Date.now();
 
       return new Promise<void>((resolve) => {
@@ -301,6 +339,7 @@ export async function runWebSocketLoadTest(
               const latency = Date.now() - sendTime;
               session.latencyMs = latency;
               session.answerAccepted = true;
+              session.acceptedAt = env.payload.receivedAt;
               latenciesMs.push(latency);
               clearTimeout(timeout);
               session.ws.removeEventListener('message', onMsg);
@@ -340,6 +379,11 @@ export async function runWebSocketLoadTest(
     ]);
     const roundClosed = Boolean(revealPayload && (revealPayload.correctOptionId || revealPayload.questionId));
     console.log(`[Load Test] Round ended automatically: ${roundClosed ? 'PASSED' : 'FAILED'}`);
+
+    const rankingPayload = await Promise.race([
+      rankingPromise,
+      delay(10000).then(() => { throw new Error('Timeout waiting for automatic ranking'); }),
+    ]);
 
     // B. Respostas únicas & Nenhuma perda & Nenhuma duplicação
     const acceptedCount = playerSessions.filter(s => s.answerAccepted).length;
@@ -430,26 +474,61 @@ export async function runWebSocketLoadTest(
     // 7. Exactly 1 ANSWER_REVEAL broadcast received on host
     const answerRevealEvents = hostEvents.filter(e => e.type === ServerEventType.ANSWER_REVEAL);
     const assertion7_singleAnswerReveal = answerRevealEvents.length === 1;
-    // 8. No duplicate transitions (strictly monotonic roomVersions)
+    // 8. No duplicate logical transitions: monotonic versions, unique event IDs,
+    // exact critical-event cardinality, and convergence across host/screens.
     const hostVersions = hostEvents.map(e => e.roomVersion);
-    const assertion8_noDuplicateTransitions = hostVersions.every((v, idx) => idx === 0 || v >= hostVersions[idx - 1]);
-    // 9. Anti-spoiler: screen ROUND_PROGRESS did not leak answer distribution or correct option
-    const screenProgressEvents = screenEvents.filter(e => e.type === ServerEventType.ROUND_PROGRESS);
-    const assertion9_noLeakOnScreen = screenProgressEvents.every(e => e.payload?.distribution === undefined && e.payload?.correctOptionId === undefined);
-    // 10. Deterministic calculation: distribution matches option counts
-    const expectedOptionCounts = activeQuestion.options.map((opt: any) => {
-      const count = playerSessions.filter(s => {
-        const chosen = activeQuestion.options[s.index % activeQuestion.options.length];
-        return chosen.id === opt.id;
-      }).length;
-      return { optionId: opt.id, count };
+    const versionsMonotonic = hostVersions.every((v, idx) => idx === 0 || v >= hostVersions[idx - 1]);
+    const hostEventIds = hostEvents.map(event => event.eventId);
+    const hostEventIdsUnique = new Set(hostEventIds).size === hostEventIds.length;
+    const criticalCountsValid = [
+      ServerEventType.QUESTION_ENDED,
+      ServerEventType.ANSWER_REVEAL,
+      ServerEventType.RANKING_UPDATED,
+    ].every(type => hostEvents.filter(event => event.type === type).length === 1);
+    const stateTransitions = hostEvents.filter(event => event.type === ServerEventType.GAME_STATE_CHANGED);
+    const logicalStateKeys = stateTransitions.map(event => `${event.payload?.state}:${event.roomVersion}`);
+    const logicalTransitionsUnique = new Set(logicalStateKeys).size === logicalStateKeys.length;
+    const hostLastState = [...stateTransitions].at(-1);
+    const screensConverged = screenEventStreams.every(events => {
+      const ids = events.map(event => event.eventId);
+      const idsUnique = new Set(ids).size === ids.length;
+      const lastState = [...events.filter(event => event.type === ServerEventType.GAME_STATE_CHANGED)].at(-1);
+      return idsUnique
+        && lastState?.payload?.state === hostLastState?.payload?.state
+        && lastState?.roomVersion === hostLastState?.roomVersion;
     });
-    const assertion10_deterministicRanking = revealPayload.distribution
-      ? expectedOptionCounts.every((exp: any) => {
-          const serverDist = revealPayload.distribution.find((d: any) => d.optionId === exp.optionId);
-          return serverDist && serverDist.count === exp.count;
-        })
-      : true;
+    const assertion8_noDuplicateTransitions = versionsMonotonic
+      && hostEventIdsUnique
+      && criticalCountsValid
+      && logicalTransitionsUnique
+      && screensConverged;
+    // 9. Anti-spoiler: screen ROUND_PROGRESS did not leak answer distribution or correct option
+    const screenProgressEvents = screenEventStreams.flatMap(events => events)
+      .filter(e => e.type === ServerEventType.ROUND_PROGRESS);
+    const assertion9_noLeakOnScreen = screenProgressEvents.every(e => e.payload?.distribution === undefined && e.payload?.correctOptionId === undefined);
+    // 10. Ranking expected is derived independently from known submitted answers,
+    // scoring and explicit tie-breakers.
+    const canonicalQuestion = questions[0];
+    const actualRanking = rankingPayload.rankings ?? [];
+
+    const allPlayersPresent = actualRanking.length === config.playerCount;
+    const correctPlayers = actualRanking.slice(0, 25);
+    const incorrectPlayers = actualRanking.slice(25);
+
+    const correctValid = correctPlayers.every((entry: any, idx: number) => {
+      const session = playerSessions.find(s => s.playerId === entry.playerId);
+      const isEven = session && session.index % 2 === 0;
+      const timeValid = idx === 0 || entry.correctResponseTimeMs >= correctPlayers[idx - 1].correctResponseTimeMs;
+      return isEven && entry.totalPoints === 125 && entry.correctCount === 1 && timeValid && entry.position === idx + 1;
+    });
+
+    const incorrectValid = incorrectPlayers.every((entry: any, idx: number) => {
+      const session = playerSessions.find(s => s.playerId === entry.playerId);
+      const isOdd = session && session.index % 2 !== 0;
+      return isOdd && entry.totalPoints === 0 && entry.correctCount === 0 && entry.correctResponseTimeMs === 0 && entry.position === idx + 26;
+    });
+
+    const assertion10_deterministicRanking = allPlayersPresent && correctValid && incorrectValid;
     // 11. Connection recovery via RESUME_SESSION verified
     const assertion11_recovery = recoverySuccessful;
     // 12. Latency SLA met (p95 < 500ms)
@@ -485,9 +564,9 @@ export async function runWebSocketLoadTest(
     console.log(`[ASSERTION 5] Respostas Únicas (sem duplicação): ${assertion5_uniqueAnswers ? 'PASSED' : 'FAILED'}`);
     console.log(`[ASSERTION 6] Fechamento Único (QUESTION_ENDED count=1): ${assertion6_singleQuestionEnded ? 'PASSED' : 'FAILED'}`);
     console.log(`[ASSERTION 7] Reveal Único (ANSWER_REVEAL count=1): ${assertion7_singleAnswerReveal ? 'PASSED' : 'FAILED'}`);
-    console.log(`[ASSERTION 8] Nenhuma Transição Duplicada (Monotonic v): ${assertion8_noDuplicateTransitions ? 'PASSED' : 'FAILED'}`);
+    console.log(`[ASSERTION 8] Transições únicas (version/eventId/cardinalidade/convergência): ${assertion8_noDuplicateTransitions ? 'PASSED' : 'FAILED'}`);
     console.log(`[ASSERTION 9] Anti-Spoiler no Telão (sem gabarito no progresso): ${assertion9_noLeakOnScreen ? 'PASSED' : 'FAILED'}`);
-    console.log(`[ASSERTION 10] Cálculo Determinístico do Ranking e Votos: ${assertion10_deterministicRanking ? 'PASSED' : 'FAILED'}`);
+    console.log(`[ASSERTION 10] Ranking esperado == ranking real: ${assertion10_deterministicRanking ? 'PASSED' : 'FAILED'}`);
     console.log(`[ASSERTION 11] Recuperação de Conexão (RESUME_SESSION): ${assertion11_recovery ? 'PASSED' : 'FAILED'}`);
     console.log(`[ASSERTION 12] Latência SLA p95 < ${config.maxP95LatencyMs}ms: ${assertion12_latencySla ? 'PASSED' : 'FAILED'}`);
     console.log(`----------------------------------------`);
@@ -536,7 +615,15 @@ export async function runWebSocketLoadTest(
   } finally {
     if (spawnedServer) {
       console.log(`[Load Test] Shutting down spawned dev server...`);
-      spawnedServer.kill();
+      if (process.platform === 'win32' && spawnedServer.pid) {
+        try {
+          execFileSync('taskkill', ['/pid', String(spawnedServer.pid), '/T', '/F'], { stdio: 'ignore' });
+        } catch {
+          spawnedServer.kill();
+        }
+      } else {
+        spawnedServer.kill();
+      }
     }
   }
 }

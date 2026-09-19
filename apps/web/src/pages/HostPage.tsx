@@ -31,11 +31,8 @@ export function HostPage() {
   const isFinalRanking = useGameStore((s) => s.isFinalRanking);
   const podium = useGameStore((s) => s.podium);
 
-  const totalPlayers = players.length;
-  const connectedPlayers = players.filter(p => {
-    const pr = presences.find(pres => pres.playerId === p.playerId);
-    return pr ? pr.connected : false;
-  }).length;
+  const totalPlayers = useGameStore((s) => s.totalPlayers);
+  const connectedPlayers = useGameStore((s) => s.connectedPlayers);
 
   useEffect(() => {
     if (pin) {

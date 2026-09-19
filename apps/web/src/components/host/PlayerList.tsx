@@ -1,3 +1,5 @@
+import { useGameStore } from '../../stores/gameStore.js';
+
 interface PlayerListProps {
   players: Array<{ playerId: string; nickname: string }>;
   presences: Array<{ playerId: string; connected: boolean }>;
@@ -5,16 +7,14 @@ interface PlayerListProps {
 }
 
 export default function PlayerList({ players, presences, onRemovePlayer }: PlayerListProps) {
-  const connectedCount = players.filter(p => {
-    const pr = presences.find(pres => pres.playerId === p.playerId);
-    return pr ? pr.connected : false;
-  }).length;
+  const connectedCount = useGameStore((state) => state.connectedPlayers);
+  const totalPlayers = useGameStore((state) => state.totalPlayers);
 
   return (
     <div className="bg-black/20 rounded-xl p-4 flex flex-col h-full">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-base font-semibold text-white">
-          Participantes ({connectedCount}/{players.length} conectados)
+          Participantes ({connectedCount}/{totalPlayers} conectados)
         </h3>
         <span className="text-xs text-blue-200">Em tempo real</span>
       </div>

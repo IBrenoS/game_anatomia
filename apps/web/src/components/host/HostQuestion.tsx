@@ -14,10 +14,17 @@ const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 export default function HostQuestion({ question, currentQuestionIndex, deadlineAt }: HostQuestionProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const answeredCount = useGameStore((s) => s.answeredCount);
-  const totalEligible = useGameStore((s) => s.totalEligible);
+  const activeEligiblePlayers = useGameStore((s) => s.activeEligiblePlayers);
   const distribution = useGameStore((s) => s.distribution);
+  const roomState = useGameStore((s) => s.roomState);
+  const remainingMs = useGameStore((s) => s.remainingMs);
+  const isPaused = roomState === 'PAUSED';
 
   useEffect(() => {
+    if (isPaused) {
+      setTimeLeft(Math.ceil(Math.max(0, remainingMs ?? 0) / 1000));
+      return;
+    }
     if (!deadlineAt) return;
 
     const updateTimer = () => {
@@ -29,7 +36,7 @@ export default function HostQuestion({ question, currentQuestionIndex, deadlineA
     updateTimer();
     const interval = setInterval(updateTimer, 500);
     return () => clearInterval(interval);
-  }, [deadlineAt]);
+  }, [deadlineAt, isPaused, remainingMs]);
 
   if (!question) return <div className="text-white text-center py-12">Carregando questão...</div>;
 
@@ -48,13 +55,19 @@ export default function HostQuestion({ question, currentQuestionIndex, deadlineA
         <div className="flex items-center gap-4">
           <div className="bg-black/40 px-4 py-2 rounded-2xl border border-white/10 text-sm font-bold text-blue-200 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{answeredCount} / {totalEligible} responderam</span>
+            <span>{answeredCount} / {activeEligiblePlayers} jogadores ativos responderam</span>
           </div>
           <div className="text-4xl font-mono font-black bg-black/40 px-6 py-2 rounded-2xl border border-white/10 text-yellow-300">
-            {timeLeft}s
+            {isPaused ? `⏸ ${timeLeft}s` : `${timeLeft}s`}
           </div>
         </div>
       </div>
+
+      {isPaused && (
+        <div role="status" className="mb-5 rounded-xl border border-amber-400/40 bg-amber-950/70 px-4 py-3 text-center font-bold text-amber-100">
+          Rodada pausada — cronômetro congelado
+        </div>
+      )}
 
       <h2 className="text-3xl md:text-4xl font-black text-center mb-6 leading-tight">
         {question.prompt}

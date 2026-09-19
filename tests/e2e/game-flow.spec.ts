@@ -194,11 +194,17 @@ test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite',
     const voltarInicioBtn = alicePage.getByRole('button', { name: /voltar ao início/i });
     await expect(voltarInicioBtn).toBeVisible();
 
+    // T14/T45: reopening the finished domain converges without manual storage cleanup.
+    await alicePage.reload();
+    await expect(alicePage.getByText(/partida finalizada/i)).toBeVisible({ timeout: 15000 });
+    const reopenedVoltarInicioBtn = alicePage.getByRole('button', { name: /voltar ao início/i });
+    await expect(reopenedVoltarInicioBtn).toBeVisible();
+
     // -------------------------------------------------------------
     // 9. Clean Navigation & Storage (P0.23, P0.24)
     // -------------------------------------------------------------
     // Alice returns home cleanly
-    await voltarInicioBtn.click();
+    await reopenedVoltarInicioBtn.click();
     await expect(alicePage).toHaveURL('/', { timeout: 5000 });
 
     // Host navigates to create another game

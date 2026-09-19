@@ -6,7 +6,7 @@ import {
   ROOM_EXPIRY_MS, COUNTDOWN_DURATION_MS, TOTAL_QUESTIONS,
   REVEAL_DURATION_MS, ROUND_RANKING_DURATION_MS, FINAL_RANKING_DURATION_MS, PODIUM_DURATION_MS,
   HEARTBEAT_PING_FRAME, HEARTBEAT_PONG_FRAME,
-  HostCommandType, ProtocolError, ServerEventType, ClientEventType,
+  ProtocolError, ServerEventType, ClientEventType,
   createServerEnvelope,
   JoinRoomSchema, ResumeSessionSchema, SubmitAnswerSchema,
   HostCommandSchema, ClientAliveSchema, RequestSnapshotSchema,
@@ -102,7 +102,10 @@ export class GameRoom extends DurableObject {
         current_question_index INTEGER NOT NULL DEFAULT -1,
         created_at INTEGER NOT NULL,
         expires_at INTEGER NOT NULL,
-        host_token_hash TEXT NOT NULL
+        host_token_hash TEXT NOT NULL,
+        phase_started_at INTEGER,
+        phase_deadline_at INTEGER,
+        countdown_kind TEXT
       );
       
       CREATE TABLE IF NOT EXISTS players (
@@ -164,6 +167,9 @@ export class GameRoom extends DurableObject {
     try { this.sql.exec('ALTER TABLE room ADD COLUMN last_state_version INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
     try { this.sql.exec('ALTER TABLE rounds ADD COLUMN accumulated_active_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
     try { this.sql.exec('ALTER TABLE answers ADD COLUMN response_time_ms INTEGER NOT NULL DEFAULT 0'); } catch { /* ignore */ }
+    try { this.sql.exec('ALTER TABLE room ADD COLUMN phase_started_at INTEGER'); } catch { /* ignore */ }
+    try { this.sql.exec('ALTER TABLE room ADD COLUMN phase_deadline_at INTEGER'); } catch { /* ignore */ }
+    try { this.sql.exec('ALTER TABLE room ADD COLUMN countdown_kind TEXT'); } catch { /* ignore */ }
   }
 
   // ─── HTTP handlers ──────────────────────────
@@ -322,8 +328,8 @@ export class GameRoom extends DurableObject {
         // ignore
       }
     }
-    if (playerId) {
-      this.markDisconnected(playerId);
+    if (playerId && meta.connectionId && this.isCanonicalPlayerConnection(playerId, meta.connectionId)) {
+      this.markDisconnected(playerId, meta.connectionId);
       this.broadcastPresenceChange(playerId, false);
       this.checkAllAnswered();
     }
@@ -335,6 +341,53 @@ export class GameRoom extends DurableObject {
   }
 
   // ─── Presence Expiration & Alarm Scheduling (Section 8) ─────
+
+  private markPlayerPresent(playerId: string, connectionId?: string, now: number = Date.now()): boolean {
+    if (!this.room) return false;
+
+    // Confirm that player exists and is not removed
+    const playerRows = this.sql.exec(
+      'SELECT player_id, nickname, removed_at FROM players WHERE player_id = ?',
+      playerId
+    ).toArray();
+    if (playerRows.length === 0 || playerRows[0].removed_at !== null) {
+      return false;
+    }
+
+    // Find the current presence row in SQLite
+    const presenceRows = this.sql.exec(
+      'SELECT connected, connection_id FROM presence WHERE player_id = ?',
+      playerId
+    ).toArray();
+
+    // Confirm that the connection belongs to the player
+    if (
+      connectionId &&
+      presenceRows.length > 0 &&
+      presenceRows[0].connection_id &&
+      presenceRows[0].connection_id !== connectionId
+    ) {
+      return false;
+    }
+
+    const wasConnected = presenceRows.length > 0 && presenceRows[0].connected === 1;
+
+    if (!wasConnected) {
+      const finalConnId = connectionId || (presenceRows[0]?.connection_id as string) || crypto.randomUUID();
+      this.sql.exec(
+        `INSERT OR REPLACE INTO presence (player_id, connection_id, last_seen_at, connected)
+         VALUES (?, ?, ?, 1)`,
+        playerId, finalConnId, now
+      );
+      this.incrementVersion();
+      this.broadcastPresenceChange(playerId, true);
+      this.ensurePresenceAlarmScheduled(now);
+      return true;
+    } else {
+      this.ensurePresenceAlarmScheduled(now);
+      return true;
+    }
+  }
 
   private checkAndExpirePresence(now: number = Date.now()): boolean {
     if (!this.room) return false;
@@ -359,7 +412,24 @@ export class GameRoom extends DurableObject {
     return expiredAny;
   }
 
-  private getNextAlarmTime(phaseDeadline: number | null = null, now: number = Date.now()): number | null {
+  private getCurrentPhaseDeadline(): number | null {
+    if (!this.room) return null;
+    if (this.room.status === GameState.PAUSED || this.room.status === GameState.LOBBY) {
+      return null;
+    }
+    if (this.room.status === GameState.QUESTION_ACTIVE) {
+      const round = this.getCurrentRound();
+      if (round && round.state === 'active') {
+        return round.deadlineAt;
+      }
+      return this.room.phaseDeadlineAt;
+    }
+    return this.room.phaseDeadlineAt;
+  }
+
+  private getNextAlarmTime(phaseDeadline?: number | null, now: number = Date.now()): number | null {
+    const effectivePhaseDeadline = phaseDeadline !== undefined ? phaseDeadline : this.getCurrentPhaseDeadline();
+
     const connectedPresences = this.getEffectivePresences(now).filter(p => p.connected);
     let earliestPresenceExpiry: number | null = null;
     for (const p of connectedPresences) {
@@ -371,17 +441,23 @@ export class GameRoom extends DurableObject {
       }
     }
 
-    if (phaseDeadline !== null && earliestPresenceExpiry !== null) {
-      return Math.min(phaseDeadline, earliestPresenceExpiry);
+    if (effectivePhaseDeadline !== null && earliestPresenceExpiry !== null) {
+      return Math.min(effectivePhaseDeadline, earliestPresenceExpiry);
     }
-    return phaseDeadline ?? earliestPresenceExpiry;
+    return effectivePhaseDeadline ?? earliestPresenceExpiry;
   }
 
-  private scheduleNextAlarm(phaseDeadline: number | null = null): void {
-    const nextAlarm = this.getNextAlarmTime(phaseDeadline);
+  private scheduleNextAlarm(phaseDeadline?: number | null, now: number = Date.now()): void {
+    const nextAlarm = this.getNextAlarmTime(phaseDeadline, now);
     if (nextAlarm !== null) {
       this.ctx.storage.setAlarm(nextAlarm);
+    } else {
+      this.ctx.storage.deleteAlarm();
     }
+  }
+
+  private ensurePresenceAlarmScheduled(now: number = Date.now()): void {
+    this.scheduleNextAlarm(undefined, now);
   }
 
   // ─── Alarm handler (phase timer + autonomous presence) ──────
@@ -393,7 +469,7 @@ export class GameRoom extends DurableObject {
     const now = Date.now();
 
     // 1. Check autonomous presence expiry
-    const expiredAny = this.checkAndExpirePresence(now);
+    this.checkAndExpirePresence(now);
 
     // If presence check already triggered a state change (e.g. all answered -> QUESTION_REVEAL),
     // do not fall through to process the new phase in the same alarm execution!
@@ -404,35 +480,49 @@ export class GameRoom extends DurableObject {
     // 2. Process phase transitions
     switch (this.room.status) {
       case GameState.COUNTDOWN:
-        this.startQuestion();
+        if (this.isCurrentPhaseDue(now)) this.startQuestion();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
         break;
       case GameState.QUESTION_ACTIVE: {
         const round = this.getCurrentRound();
-        if (round && (now >= round.deadlineAt || !expiredAny)) {
+        if (round && now >= round.deadlineAt) {
           this.endCurrentQuestion('deadline');
         } else {
-          // Presence expired mid-round, but others still have not answered; reschedule deadline
-          this.scheduleNextAlarm(round?.deadlineAt ?? null);
+          // Presence checks are independent from phase deadlines. If nobody
+          // expired, the question remains active and the next relevant alarm
+          // is the earliest presence expiry or the authoritative deadline.
+          this.scheduleNextAlarm(round?.deadlineAt ?? null, now);
         }
         break;
       }
       case GameState.QUESTION_REVEAL:
-        this.handleShowRanking();
+        if (this.isCurrentPhaseDue(now)) this.handleShowRanking();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
         break;
       case GameState.ROUND_RANKING:
-        this.handleNextQuestion();
+        if (this.isCurrentPhaseDue(now)) this.handleNextQuestion();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
         break;
       case GameState.FINAL_RANKING:
-        this.handleStartPodium();
+        if (this.isCurrentPhaseDue(now)) this.handleStartPodium();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
         break;
       case GameState.PODIUM:
-        this.handleEndGame();
+        if (this.isCurrentPhaseDue(now)) this.handleEndGame();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
         break;
       case GameState.FINISHED:
-        this.cleanupRoom();
+        if (this.isCurrentPhaseDue(now)) this.cleanupRoom();
+        else this.scheduleNextAlarm(this.room.phaseDeadlineAt, now);
+        break;
+      case GameState.PAUSED:
+        // Presence expiry check was executed at the beginning of alarm().
+        // Do NOT consume remainingMs, do NOT advance game state, do NOT resume.
+        // Reschedule next presence alarm if needed.
+        this.ensurePresenceAlarmScheduled(now);
         break;
       default:
-        this.scheduleNextAlarm(null);
+        this.scheduleNextAlarm(null, now);
     }
   }
 
@@ -516,12 +606,20 @@ export class GameRoom extends DurableObject {
     ws.send(JSON.stringify(sessionEvent));
     
     // Broadcast PLAYER_JOINED to everyone
+    const joinedCounts = getRoomPlayerCounts(
+      this.getActivePlayers(),
+      this.getEffectivePresences(now),
+      this.room!.currentQuestionIndex,
+      now
+    );
     this.broadcastToAll(createServerEnvelope(
       ServerEventType.PLAYER_JOINED,
       {
         playerId,
         nickname,
+        joinedAt: now,
         playerCount: this.getActivePlayers().length,
+        ...joinedCounts,
       },
       this.room!.roomVersion
     ));
@@ -533,7 +631,7 @@ export class GameRoom extends DurableObject {
     this.sendSnapshot(ws, 'player', playerId);
 
     // Schedule presence check alarm
-    this.scheduleNextAlarm();
+    this.ensurePresenceAlarmScheduled(now);
   }
 
   private async handleResumeSession(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
@@ -598,6 +696,9 @@ export class GameRoom extends DurableObject {
     
     // Broadcast presence change
     this.broadcastPresenceChange(playerId, true);
+
+    // Rearm presence scheduler (V3.2 requirement 3)
+    this.ensurePresenceAlarmScheduled(now);
   }
 
   private async handleSubmitAnswer(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
@@ -607,18 +708,25 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    if (!this.room || this.room.status !== GameState.QUESTION_ACTIVE) {
-      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active question', correlationId);
-      return;
-    }
-    
-    const playerId = this.getConnectionMeta(ws).playerId;
+    const meta = this.getConnectionMeta(ws);
+    const playerId = meta.playerId;
     if (!playerId) {
       this.sendAnswerRejected(ws, ProtocolError.UNAUTHORIZED, 'Not authenticated', correlationId);
       return;
     }
     
     const now = Date.now();
+    this.setConnectionMeta(ws, { lastSeenAt: now });
+    const markedPresent = this.markPlayerPresent(playerId, meta.connectionId, now);
+    if (!markedPresent) {
+      this.sendAnswerRejected(ws, ProtocolError.UNAUTHORIZED, 'Player not active or connection mismatch', correlationId);
+      return;
+    }
+
+    if (!this.room || this.room.status !== GameState.QUESTION_ACTIVE) {
+      this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active question', correlationId);
+      return;
+    }
     const round = this.getCurrentRound();
     if (!round) {
       this.sendAnswerRejected(ws, ProtocolError.QUESTION_NOT_ACTIVE, 'No active round', correlationId);
@@ -739,9 +847,7 @@ export class GameRoom extends DurableObject {
     
     // P0.12 & P0.13: Broadcast progress without answer leaks
     const allAnswers = this.getAnswersForQuestion(parsed.data.questionId);
-    const activePlayers = this.getActivePlayers();
-    const presences = this.getEffectivePresences(now);
-    const counts = getRoomPlayerCounts(activePlayers, presences, this.room.currentQuestionIndex, now);
+    const progress = this.getCanonicalProgress(parsed.data.questionId, now);
 
     // Host receives distribution counts (NO correct answer highlight)
     const hostDistribution = question.options.map(opt => {
@@ -757,8 +863,8 @@ export class GameRoom extends DurableObject {
       ServerEventType.ROUND_PROGRESS,
       {
         questionId: parsed.data.questionId,
-        answeredCount: allAnswers.length,
-        totalEligible: counts.eligiblePlayers,
+        ...progress,
+        totalEligible: progress.activeEligiblePlayers,
         distribution: hostDistribution,
       },
       this.room!.roomVersion
@@ -769,8 +875,8 @@ export class GameRoom extends DurableObject {
       ServerEventType.ROUND_PROGRESS,
       {
         questionId: parsed.data.questionId,
-        answeredCount: allAnswers.length,
-        totalEligible: counts.eligiblePlayers,
+        ...progress,
+        totalEligible: progress.activeEligiblePlayers,
       },
       this.room!.roomVersion
     );
@@ -787,9 +893,9 @@ export class GameRoom extends DurableObject {
     const meta = this.getConnectionMeta(ws);
     if (!meta.playerId) return;
 
-    // Backward compatibility for clients from a previous deployment. Keep the
-    // liveness timestamp in the hibernation attachment instead of SQLite.
-    this.setConnectionMeta(ws, { lastSeenAt: Date.now() });
+    const now = Date.now();
+    this.setConnectionMeta(ws, { lastSeenAt: now });
+    this.markPlayerPresent(meta.playerId, meta.connectionId, now);
   }
 
   private async handleHostCommand(ws: WebSocket, payload: unknown, correlationId?: string): Promise<void> {
@@ -846,15 +952,6 @@ export class GameRoom extends DurableObject {
       case 'END_QUESTION':
         this.endCurrentQuestion('host', correlationId);
         break;
-      case 'SHOW_RANKING':
-        this.handleShowRanking(correlationId);
-        break;
-      case 'NEXT_QUESTION':
-        this.handleNextQuestion(correlationId);
-        break;
-      case 'START_PODIUM':
-        this.handleStartPodium(correlationId);
-        break;
       case 'END_GAME':
         this.handleEndGame(correlationId);
         break;
@@ -873,6 +970,11 @@ export class GameRoom extends DurableObject {
     const meta = this.getConnectionMeta(ws);
     const playerId = meta.playerId;
     const role = meta.role || 'player';
+    if (role === 'player' && playerId) {
+      const now = Date.now();
+      this.setConnectionMeta(ws, { lastSeenAt: now });
+      this.markPlayerPresent(playerId, meta.connectionId, now);
+    }
     this.sendSnapshot(ws, role, playerId, correlationId);
   }
 
@@ -892,11 +994,17 @@ export class GameRoom extends DurableObject {
       return;
     }
     
-    this.transitionTo(GameState.COUNTDOWN, correlationId);
+    const countdownStartedAt = Date.now();
+    const countdownDeadlineAt = countdownStartedAt + COUNTDOWN_DURATION_MS;
+    this.transitionTo(GameState.COUNTDOWN, correlationId, {
+      phaseStartedAt: countdownStartedAt,
+      phaseDeadlineAt: countdownDeadlineAt,
+      countdownKind: 'INITIAL',
+    });
     this.setEntryLocked(true);
     
     // Set alarm for countdown end
-    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    this.scheduleNextAlarm(countdownDeadlineAt);
   }
 
   private startQuestion(): void {
@@ -916,7 +1024,10 @@ export class GameRoom extends DurableObject {
         `UPDATE rounds SET state = 'active', started_at = ?, deadline_at = ?, remaining_ms = NULL WHERE question_id = ?`,
         now, deadlineAt, question.id
       );
-      this.sql.exec(`UPDATE room SET status = 'QUESTION_ACTIVE'`);
+      this.sql.exec(
+        `UPDATE room SET status = 'QUESTION_ACTIVE', phase_started_at = ?, phase_deadline_at = ?, countdown_kind = NULL`,
+        now, deadlineAt
+      );
     } else {
       nextIndex = this.room.currentQuestionIndex + 1;
       if (nextIndex >= TOTAL_QUESTIONS) return;
@@ -924,8 +1035,8 @@ export class GameRoom extends DurableObject {
       deadlineAt = now + question.durationMs;
       
       this.sql.exec(
-        `UPDATE room SET current_question_index = ?, status = 'QUESTION_ACTIVE'`,
-        nextIndex
+        `UPDATE room SET current_question_index = ?, status = 'QUESTION_ACTIVE', phase_started_at = ?, phase_deadline_at = ?, countdown_kind = NULL`,
+        nextIndex, now, deadlineAt
       );
       this.sql.exec(
         `INSERT OR REPLACE INTO rounds (question_id, state, started_at, deadline_at, remaining_ms, accumulated_active_ms)
@@ -949,8 +1060,13 @@ export class GameRoom extends DurableObject {
       {
         question: publicQ,
         questionIndex: nextIndex,
+        questionVersion: nextIndex,
         startedAt: now,
         deadlineAt,
+        phaseStartedAt: now,
+        phaseDeadlineAt: deadlineAt,
+        countdownKind: null,
+        ...this.getCanonicalProgress(question.id, now),
       },
       this.room!.roomVersion
     ));
@@ -986,7 +1102,12 @@ export class GameRoom extends DurableObject {
     });
     
     // Transition to QUESTION_REVEAL
-    this.transitionTo(GameState.QUESTION_REVEAL, correlationId);
+    const revealDeadlineAt = now + REVEAL_DURATION_MS;
+    this.transitionTo(GameState.QUESTION_REVEAL, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt: revealDeadlineAt,
+      countdownKind: null,
+    });
     
     // Broadcast QUESTION_ENDED
     this.broadcastToAll(createServerEnvelope(
@@ -1038,7 +1159,7 @@ export class GameRoom extends DurableObject {
     }
 
     // P0.15: Schedule automatic reveal transition to ranking (5 seconds)
-    this.scheduleNextAlarm(Date.now() + REVEAL_DURATION_MS);
+    this.scheduleNextAlarm(revealDeadlineAt);
   }
 
   private handleShowRanking(correlationId?: string): void {
@@ -1047,7 +1168,13 @@ export class GameRoom extends DurableObject {
     const isLastQuestion = this.room.currentQuestionIndex >= TOTAL_QUESTIONS - 1;
     const nextState = isLastQuestion ? GameState.FINAL_RANKING : GameState.ROUND_RANKING;
     
-    this.transitionTo(nextState, correlationId);
+    const now = Date.now();
+    const phaseDeadlineAt = now + (isLastQuestion ? FINAL_RANKING_DURATION_MS : ROUND_RANKING_DURATION_MS);
+    this.transitionTo(nextState, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt,
+      countdownKind: null,
+    });
     
     const ranking = this.computeRanking();
     
@@ -1060,9 +1187,9 @@ export class GameRoom extends DurableObject {
 
     // P0.17 & P0.19: Schedule next automatic step
     if (isLastQuestion) {
-      this.scheduleNextAlarm(Date.now() + FINAL_RANKING_DURATION_MS);
+      this.scheduleNextAlarm(phaseDeadlineAt);
     } else {
-      this.scheduleNextAlarm(Date.now() + ROUND_RANKING_DURATION_MS);
+      this.scheduleNextAlarm(phaseDeadlineAt);
     }
   }
 
@@ -1070,14 +1197,26 @@ export class GameRoom extends DurableObject {
     if (!this.room || this.room.status !== GameState.ROUND_RANKING) return;
     if (this.room.currentQuestionIndex >= TOTAL_QUESTIONS - 1) return;
     
-    this.transitionTo(GameState.COUNTDOWN, correlationId);
-    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    const now = Date.now();
+    const phaseDeadlineAt = now + COUNTDOWN_DURATION_MS;
+    this.transitionTo(GameState.COUNTDOWN, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt,
+      countdownKind: 'NEXT_QUESTION',
+    });
+    this.scheduleNextAlarm(phaseDeadlineAt);
   }
 
   private handleStartPodium(correlationId?: string): void {
     if (!this.room || this.room.status !== GameState.FINAL_RANKING) return;
     
-    this.transitionTo(GameState.PODIUM, correlationId);
+    const now = Date.now();
+    const phaseDeadlineAt = now + PODIUM_DURATION_MS;
+    this.transitionTo(GameState.PODIUM, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt,
+      countdownKind: null,
+    });
     
     const ranking = this.computeRanking();
     const podium = ranking.slice(0, 3);
@@ -1089,13 +1228,19 @@ export class GameRoom extends DurableObject {
     ));
 
     // P0.21 & P0.22: Schedule automatic transition to FINISHED after ceremony
-    this.scheduleNextAlarm(Date.now() + PODIUM_DURATION_MS);
+    this.scheduleNextAlarm(phaseDeadlineAt);
   }
 
   private handleEndGame(correlationId?: string): void {
     if (!this.room) return;
-    
-    this.transitionTo(GameState.FINISHED, correlationId);
+    const now = Date.now();
+    const cleanupAt = now + ROOM_EXPIRY_MS;
+    this.sql.exec('UPDATE room SET expires_at = ?', cleanupAt);
+    this.transitionTo(GameState.FINISHED, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt: cleanupAt,
+      countdownKind: null,
+    });
     this.ctx.storage.deleteAlarm();
     
     const ranking = this.computeRanking();
@@ -1107,7 +1252,7 @@ export class GameRoom extends DurableObject {
     ));
     
     // Set cleanup alarm
-    this.scheduleNextAlarm(Date.now() + ROOM_EXPIRY_MS);
+    this.scheduleNextAlarm(cleanupAt);
   }
 
   private handlePause(correlationId?: string, ws?: WebSocket): void {
@@ -1133,18 +1278,29 @@ export class GameRoom extends DurableObject {
       );
     }
     
-    this.ctx.storage.deleteAlarm();
-    this.transitionTo(GameState.PAUSED, correlationId);
+    const pauseNow = Date.now();
+    this.transitionTo(GameState.PAUSED, correlationId, {
+      phaseStartedAt: pauseNow,
+      phaseDeadlineAt: null,
+      countdownKind: null,
+    });
+    this.ensurePresenceAlarmScheduled(pauseNow);
   }
 
   private handleResume(correlationId?: string): void {
     if (!this.room || this.room.status !== GameState.PAUSED) return;
     
     // Resume triggers countdown, then question resumes with remaining time
-    this.transitionTo(GameState.COUNTDOWN, correlationId);
+    const now = Date.now();
+    const phaseDeadlineAt = now + COUNTDOWN_DURATION_MS;
+    this.transitionTo(GameState.COUNTDOWN, correlationId, {
+      phaseStartedAt: now,
+      phaseDeadlineAt,
+      countdownKind: 'RESUME',
+    });
     
     // After countdown, we'll resume the question with remainingMs
-    this.scheduleNextAlarm(Date.now() + COUNTDOWN_DURATION_MS);
+    this.scheduleNextAlarm(phaseDeadlineAt);
   }
 
   private handleLockEntries(correlationId?: string): void {
@@ -1198,6 +1354,9 @@ export class GameRoom extends DurableObject {
       currentQuestionIndex: r.current_question_index as number,
       createdAt: r.created_at as number,
       expiresAt: r.expires_at as number,
+      phaseStartedAt: (r.phase_started_at as number | null) ?? null,
+      phaseDeadlineAt: (r.phase_deadline_at as number | null) ?? null,
+      countdownKind: (r.countdown_kind as RoomData['countdownKind']) ?? null,
     };
   }
 
@@ -1276,7 +1435,11 @@ export class GameRoom extends DurableObject {
 
     return this.getPresences().map(presence => {
       const player = players.find(p => p.playerId === presence.playerId);
-      const ws = playerSockets.find(socket => this.getConnectionMeta(socket).playerId === presence.playerId);
+      const ws = playerSockets.find(socket => {
+        const meta = this.getConnectionMeta(socket);
+        return meta.playerId === presence.playerId
+          && meta.connectionId === presence.connectionId;
+      });
 
       let lastSeenAt = presence.lastSeenAt;
       if (ws) {
@@ -1303,6 +1466,47 @@ export class GameRoom extends DurableObject {
     return buildRanking(scores, players);
   }
 
+  private getCanonicalProgress(questionId: string, now: number = Date.now()): {
+    answeredCount: number;
+    totalPlayers: number;
+    connectedPlayers: number;
+    eligiblePlayers: number;
+    activeEligiblePlayers: number;
+  } {
+    if (!this.room) {
+      return {
+        answeredCount: 0,
+        totalPlayers: 0,
+        connectedPlayers: 0,
+        eligiblePlayers: 0,
+        activeEligiblePlayers: 0,
+      };
+    }
+
+    const players = this.getActivePlayers();
+    const presences = this.getEffectivePresences(now);
+    const counts = getRoomPlayerCounts(players, presences, this.room.currentQuestionIndex, now);
+    const activeEligibleIds = new Set(
+      players
+        .filter(player => {
+          if (!isPlayerEligible(player, this.room!.currentQuestionIndex)) return false;
+          const presence = presences.find(candidate => candidate.playerId === player.playerId);
+          return presence ? isPlayerActive(presence, now) : false;
+        })
+        .map(player => player.playerId)
+    );
+    const answeredCount = this.getAnswersForQuestion(questionId)
+      .filter(answer => activeEligibleIds.has(answer.playerId)).length;
+
+    return { answeredCount, ...counts };
+  }
+
+  private isCurrentPhaseDue(now: number): boolean {
+    return this.room?.phaseDeadlineAt !== null
+      && this.room?.phaseDeadlineAt !== undefined
+      && now >= this.room.phaseDeadlineAt;
+  }
+
   private incrementVersion(): void {
     this.sql.exec('UPDATE room SET room_version = room_version + 1');
     this.loadRoom();
@@ -1313,10 +1517,25 @@ export class GameRoom extends DurableObject {
     this.loadRoom();
   }
 
-  private transitionTo(newState: GameState, correlationId?: string): void {
+  private transitionTo(
+    newState: GameState,
+    correlationId?: string,
+    phase: {
+      phaseStartedAt: number;
+      phaseDeadlineAt: number | null;
+      countdownKind: RoomData['countdownKind'];
+    } = {
+      phaseStartedAt: Date.now(),
+      phaseDeadlineAt: null,
+      countdownKind: null,
+    }
+  ): void {
     if (!this.room) return;
     assertTransition(this.room.status, newState);
-    this.sql.exec('UPDATE room SET status = ?', newState);
+    this.sql.exec(
+      'UPDATE room SET status = ?, phase_started_at = ?, phase_deadline_at = ?, countdown_kind = ?',
+      newState, phase.phaseStartedAt, phase.phaseDeadlineAt, phase.countdownKind
+    );
     this.incrementVersion();
     this.sql.exec('UPDATE room SET last_state_version = ? WHERE pin = ?', this.room.roomVersion, this.room.pin);
     this.room.lastStateVersion = this.room.roomVersion;
@@ -1351,10 +1570,18 @@ export class GameRoom extends DurableObject {
     }
   }
 
-  private markDisconnected(playerId: string): void {
+  private isCanonicalPlayerConnection(playerId: string, connectionId: string): boolean {
+    const rows = this.sql.exec(
+      'SELECT connection_id FROM presence WHERE player_id = ?',
+      playerId,
+    ).toArray();
+    return rows.length > 0 && rows[0].connection_id === connectionId;
+  }
+
+  private markDisconnected(playerId: string, connectionId: string): void {
     this.sql.exec(
-      'UPDATE presence SET connected = 0 WHERE player_id = ?',
-      playerId
+      'UPDATE presence SET connected = 0 WHERE player_id = ? AND connection_id = ?',
+      playerId, connectionId
     );
   }
 
@@ -1400,6 +1627,13 @@ export class GameRoom extends DurableObject {
 
   private broadcastStateChange(correlationId?: string): void {
     if (!this.room) return;
+    const progress = this.room.currentQuestionIndex >= 0
+      ? this.getCanonicalProgress(questions[this.room.currentQuestionIndex].id)
+      : {
+          answeredCount: 0,
+          ...getRoomPlayerCounts(this.getActivePlayers(), this.getEffectivePresences(), this.room.currentQuestionIndex, Date.now()),
+        };
+    const round = this.getCurrentRound();
     this.broadcastToAll(createServerEnvelope(
       ServerEventType.GAME_STATE_CHANGED,
       {
@@ -1407,6 +1641,12 @@ export class GameRoom extends DurableObject {
         roomVersion: this.room.roomVersion,
         entryLocked: this.room.entryLocked,
         currentQuestionIndex: this.room.currentQuestionIndex,
+        gameState: this.room.status,
+        phaseStartedAt: this.room.phaseStartedAt,
+        phaseDeadlineAt: this.room.phaseDeadlineAt,
+        countdownKind: this.room.countdownKind,
+        remainingMs: this.room.status === GameState.PAUSED ? round?.remainingMs ?? null : null,
+        ...progress,
       },
       this.room.roomVersion,
       correlationId
@@ -1419,10 +1659,19 @@ export class GameRoom extends DurableObject {
     const presences = this.getEffectivePresences(now);
     const pr = presences.find(p => p.playerId === playerId);
     const status = pr?.status ?? (connected ? 'CONNECTED' : 'TEMPORARILY_DISCONNECTED');
+    const counts = getRoomPlayerCounts(
+      this.getActivePlayers(),
+      presences,
+      this.room.currentQuestionIndex,
+      now
+    );
+    const answeredCount = this.room.currentQuestionIndex >= 0
+      ? this.getCanonicalProgress(questions[this.room.currentQuestionIndex].id, now).answeredCount
+      : 0;
 
     this.broadcastToAll(createServerEnvelope(
       ServerEventType.PLAYER_PRESENCE_CHANGED,
-      { playerId, connected, status, reason },
+      { playerId, connected, status, reason, answeredCount, ...counts },
       this.room.roomVersion
     ));
   }
@@ -1529,6 +1778,19 @@ export class GameRoom extends DurableObject {
       }
     }
 
+    const progress = this.room.currentQuestionIndex >= 0
+      ? this.getCanonicalProgress(questions[this.room.currentQuestionIndex].id, now)
+      : { answeredCount: 0, ...counts };
+    const selectedAnswer = this.room.currentQuestionIndex >= 0
+      ? (personalAnswers as Array<{ questionId: string; optionId: string }>).find(
+          answer => answer.questionId === questions[this.room!.currentQuestionIndex].id
+        )
+      : undefined;
+    const phaseStartedAt = this.room.phaseStartedAt
+      ?? (this.room.status === GameState.QUESTION_ACTIVE ? round?.startedAt ?? null : null);
+    const phaseDeadlineAt = this.room.phaseDeadlineAt
+      ?? (this.room.status === GameState.QUESTION_ACTIVE ? round?.deadlineAt ?? null : null);
+
     const snapshot = createServerEnvelope(
       ServerEventType.SNAPSHOT,
       {
@@ -1539,7 +1801,25 @@ export class GameRoom extends DurableObject {
           lastStateVersion: this.room.lastStateVersion ?? 0,
           entryLocked: this.room.entryLocked,
           currentQuestionIndex: this.room.currentQuestionIndex,
+          phaseStartedAt,
+          phaseDeadlineAt,
+          countdownKind: this.room.countdownKind,
         },
+        gameState: this.room.status,
+        phaseStartedAt,
+        phaseDeadlineAt,
+        currentQuestionIndex: this.room.currentQuestionIndex,
+        question: currentQuestion,
+        questionVersion: this.room.currentQuestionIndex,
+        remainingMs: this.room.status === GameState.PAUSED ? round?.remainingMs ?? null : null,
+        countdownKind: this.room.countdownKind,
+        answerSubmitted: Boolean(selectedAnswer),
+        selectedOptionId: selectedAnswer?.optionId ?? null,
+        answeredCount: progress.answeredCount,
+        totalPlayers: progress.totalPlayers,
+        connectedPlayers: progress.connectedPlayers,
+        eligiblePlayers: progress.eligiblePlayers,
+        activeEligiblePlayers: progress.activeEligiblePlayers,
         players,
         presences,
         scores,
@@ -1554,7 +1834,10 @@ export class GameRoom extends DurableObject {
         personalAnswers,
         personalResult,
         personalScore,
-        counts,
+        counts: {
+          ...progress,
+          totalEligible: progress.activeEligiblePlayers,
+        },
         playerId,
       },
       this.room.roomVersion,

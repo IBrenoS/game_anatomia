@@ -141,6 +141,7 @@ export function getRoomPlayerCounts(
   totalPlayers: number;
   connectedPlayers: number;
   eligiblePlayers: number;
+  activeEligiblePlayers: number;
 } {
   const nonRemoved = players.filter(p => p.removedAt === null);
   const totalPlayers = nonRemoved.length;
@@ -149,7 +150,11 @@ export function getRoomPlayerCounts(
     return pr ? isPlayerActive(pr, now) : false;
   }).length;
   const eligiblePlayers = nonRemoved.filter(p => isPlayerEligible(p, questionIndex)).length;
+  const activeEligiblePlayers = nonRemoved.filter(p => {
+    if (!isPlayerEligible(p, questionIndex)) return false;
+    const presence = presences.find(candidate => candidate.playerId === p.playerId);
+    return presence ? isPlayerActive(presence, now) : false;
+  }).length;
 
-  return { totalPlayers, connectedPlayers, eligiblePlayers };
+  return { totalPlayers, connectedPlayers, eligiblePlayers, activeEligiblePlayers };
 }
-

@@ -18,6 +18,8 @@ export function PlayerPage() {
   const { connect, connectionState } = useGameSocket();
 
   const roomState = useGameStore((s) => s.roomState);
+  const remainingMs = useGameStore((s) => s.remainingMs);
+  const answerRejected = useGameStore((s) => s.answerRejected);
   const playerId = useGameStore((s) => s.playerId);
   const nickname = useGameStore((s) => s.nickname);
   const currentQuestionIndex = useGameStore((s) => s.currentQuestionIndex);
@@ -78,6 +80,9 @@ export function PlayerPage() {
             deadlineAt={deadlineAt}
             selectedOptionId={selectedOptionId}
             answerSubmitted={answerSubmitted}
+            roomState={roomState}
+            remainingMs={remainingMs}
+            answerRejected={answerRejected}
           />
         );
       case 'QUESTION_REVEAL':

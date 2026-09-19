@@ -13,11 +13,11 @@
 | **Encerramento da Conexão TCP** | O Android pode manter o socket aberto até timeout de keepalive, a menos que o Doze Mode corte os dados em segundo plano. | O iOS fecha abruptamente conexões celulares/Wi-Fi após suspensão profunda sem enviar `CLOSE` frame ou TCP FIN limpo (erro 1006). | O socket pode estar em estado "zumbi" (half-open) no momento do desbloqueio. | `visibilitychange`, `pageshow` e `focus` disparam `handleForegroundSync()`. Se fechado, reconecta imediatamente; se aberto, envia `REQUEST_SNAPSHOT` provocando falha/resposta imediata. |
 | **BFCache (Back-Forward Cache)** | Suportado, mas menos agressivo em páginas dinâmicas com WebSocket ativo. | **Altamente agressivo:** Salva o snapshot da página na memória do sistema e restaura no `pageshow` (`persisted === true`). | O estado visual pode apresentar elementos defasados ao restaurar do cache. | Ouvinte `window.addEventListener('pageshow', ...)` invoca `handleForegroundSync()`. |
 | **Descarte de Aba por Memória (LMK)** | Sob pressão de memória (ex: abrir a câmera ou outro app pesado), o *Low Memory Killer* do Android descarta a aba. Ao reabrir, o Chrome recarrega a URL. | O WebKit descarta o processo web e recarrega a página ao focar. | O estado em memória (`gameStore`) é reinicializado. | O `reconnectToken` é persistido no `localStorage` (`batalha_session_{pin}`). Na inicialização de `/play/:pin`, o cliente envia `RESUME_SESSION` e restaura o jogador sem voltar à tela de entrada. |
-| **Bloqueio de Tela / Power Button** | Dispara `visibilitychange` para `hidden` e evento `blur`. Ao desbloquear, dispara `visibilitychange` para `visible` e `focus`. | Dispara `visibilitychange` para `hidden`, `pagehide` e `blur`. Ao desbloquear, dispara `visibilitychange` para `visible`, `pageshow` e `focus`. | Gatilhos nativos cobrem 100% dos eventos em ambos os SOs. | Registro unificado no `WebSocketManager`: `visibilitychange`, `pageshow`, `focus`, `online`, `offline`. |
+| **Bloqueio de Tela / Power Button** | Dispara `visibilitychange` para `hidden` e evento `blur`. Ao desbloquear, normalmente dispara `visibilitychange` para `visible` e `focus`. | Dispara `visibilitychange` para `hidden`, `pagehide` e `blur`. Ao desbloquear, normalmente dispara `visibilitychange` para `visible`, `pageshow` e `focus`. | A cobertura automatizada valida os handlers; variações reais de SO/fabricante ainda exigem hardware físico. | Registro unificado no `WebSocketManager`: `visibilitychange`, `pageshow`, `focus`, `online`, `offline`. |
 
 ---
 
-## 2. Dispositivos e Ambientes de Teste Homologados
+## 2. Dispositivos e Ambientes Requeridos para Homologação
 
 Antes do aceite final, os testes devem ser executados em pelo menos:
 1. **Android:** Smartphone com Android 11+ e Google Chrome (versão estável mais recente). Ex: Samsung Galaxy (OneUI) ou Google Pixel.
@@ -58,9 +58,9 @@ Antes do aceite final, os testes devem ser executados em pelo menos:
 
 ---
 
-### Cenário 3: Transição QUESTION_REVEAL → ROUND_RANKING
+### Cenário 3: Transição Automática QUESTION_REVEAL → ROUND_RANKING
 - **Passo 3.1:** Com o celular na tela de revelação, minimizar o navegador ou bloquear a tela. Aguardar 5 segundos.
-- **Passo 3.2:** No Host, clicar em **"Ver Classificação"**. O Host transiciona para a classificação da rodada.
+- **Passo 3.2:** Sem executar comando manual no Host, aguardar os 5 segundos da revelação. O loop automático transiciona para a classificação da rodada.
 - **Passo 3.3:** No celular, voltar para o primeiro plano (foreground). **SEM REFRESH MANUAL.**
 - **Critério de Aceite:**
   - [ ] O cliente converge automaticamente para a tela de **Classificação da Rodada**.
@@ -69,9 +69,9 @@ Antes do aceite final, os testes devem ser executados em pelo menos:
 
 ---
 
-### Cenário 4: Transição ROUND_RANKING → Próxima Pergunta (QUESTION_ACTIVE)
+### Cenário 4: Transição Automática ROUND_RANKING → COUNTDOWN → QUESTION_ACTIVE
 - **Passo 4.1:** Com o celular na tela de classificação, minimizar o navegador ou bloquear a tela.
-- **Passo 4.2:** No Host, clicar em **"Próxima Pergunta"**. O Host transiciona para a Questão 2.
+- **Passo 4.2:** Sem executar comando manual no Host, aguardar o ranking e a contagem regressiva automáticos. O servidor transiciona para a Questão 2.
 - **Passo 4.3:** No celular, retornar ao primeiro plano (foreground). **SEM REFRESH MANUAL.**
 - **Critério de Aceite:**
   - [ ] O cliente converge automaticamente para a **Questão 2 de 10**.
@@ -103,6 +103,13 @@ Antes do aceite final, os testes devem ser executados em pelo menos:
 ---
 
 ## 4. Tabela de Homologação Final para Assinatura
+
+Status desta revisão:
+
+- **Android Chromium automatizado:** AUTOMATED PASS somente quando o gate E2E da execução corrente estiver verde.
+- **iOS WebKit automatizado:** AUTOMATED PASS somente quando o gate E2E da execução corrente estiver verde.
+- **Android físico:** PHYSICAL NOT EXECUTED.
+- **iPhone físico:** PHYSICAL NOT EXECUTED.
 
 | ID Teste | Dispositivo / SO | Navegador | Data | Responsável | Resultado | Observações |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
