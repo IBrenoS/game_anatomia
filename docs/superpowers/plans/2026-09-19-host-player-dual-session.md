@@ -450,7 +450,7 @@ git commit -m "feat: renderizar experiencia host player justa"
 - Consumes: protocolo existente `JOIN_ROOM`, `RESUME_SESSION`, `SUBMIT_ANSWER`, `HOST_COMMAND`.
 - Produces: nenhuma API nova; comprova que backend existente satisfaz o contrato.
 
-- [ ] **Step 1: Escrever teste de integração T2/T3/T6/T8/T9/T10**
+- [x] **Step 1: Escrever teste de integração T2/T3/T6/T8/T9/T10**
 
 Adicionar um `describe('Host + Player dual session')` que:
 
@@ -479,13 +479,13 @@ expect(joined.payload.playerId).toBe(playerId);
 
 Depois iniciar a partida pelo Host, responder pelo Player, confirmar `ANSWER_ACCEPTED` e `answeredCount`, fechar apenas Player, reconectar via `RESUME_SESSION` e verificar mesmo `playerId`, resposta e score. Fechar apenas Host e comprovar que o Player continua recebendo snapshot. Concluir o jogo usando os helpers já existentes e verificar que o criador aparece em ranking/pódio.
 
-- [ ] **Step 2: Executar caracterização**
+- [x] **Step 2: Executar caracterização**
 
 Run: `pnpm vitest run --config tests/vitest.integration.config.ts tests/integration/worker-game-room.test.ts --testNamePattern "Host \+ Player dual session"`
 
 Expected: PASS se o backend já sustenta o contrato. Se falhar, registrar o ponto exato; uma falha de helper/teste não autoriza mudança backend.
 
-- [ ] **Step 3: Aplicar somente correção backend demonstrada, se necessária**
+- [x] **Step 3: Aplicar somente correção backend demonstrada, se necessária**
 
 Se a falha real mostrar interferência entre os papéis, limitar a correção aos metadados por WebSocket. Exemplo aceitável:
 
@@ -499,13 +499,13 @@ if (meta.role !== 'player' || !meta.playerId) {
 
 Não alterar schemas, scoring ou tabelas se o teste passar sem isso.
 
-- [ ] **Step 4: Executar integração completa**
+- [x] **Step 4: Executar integração completa**
 
 Run: `pnpm test:integration`
 
 Expected: PASS em toda a suíte, incluindo presença e mechanical gate.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add tests/integration/worker-game-room.test.ts

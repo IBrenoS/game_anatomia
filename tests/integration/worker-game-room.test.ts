@@ -1824,4 +1824,132 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect((roomB as any).getActivePlayers()).toHaveLength(1);
     });
   });
+
+  describe('Host + Player dual session', () => {
+    it('T2/T3/T6/T8/T9/T10: mantém identidades, score e lifecycle independentes', async () => {
+      await room.fetch(createHostRequest());
+      const hostServer = ctx.getWebSockets('role:host')[0];
+      const host = attachTestClient(room, hostServer, hostServer.peer!);
+
+      await room.fetch(new Request('http://internal/ws?role=player', {
+        headers: { Upgrade: 'websocket' },
+      }));
+      const creatorServer = ctx.getWebSockets('role:player')[0];
+      const creator = attachTestClient(room, creatorServer, creatorServer.peer!);
+      await creator.send(createClientEnvelope('JOIN_ROOM', {
+        pin: testPin,
+        nickname: 'Criador',
+      }, 0));
+
+      const accepted = creator.getAllMessages().find(
+        message => message.type === ServerEventType.SESSION_ACCEPTED,
+      );
+      expect(accepted).toBeDefined();
+      const playerId = accepted.payload.playerId as string;
+      const reconnectToken = accepted.payload.reconnectToken as string;
+
+      expect(ctx.getWebSockets('role:host')).toHaveLength(1);
+      expect(ctx.getWebSockets('role:player')).toHaveLength(1);
+      const joined = host.getAllMessages().find(
+        message => message.type === ServerEventType.PLAYER_JOINED,
+      );
+      expect(joined?.payload).toMatchObject({
+        playerId,
+        nickname: 'Criador',
+        totalPlayers: 1,
+        connectedPlayers: 1,
+      });
+
+      await host.send(createClientEnvelope('HOST_COMMAND', {
+        command: 'START_GAME',
+        expectedRoomVersion: (room as any).room.roomVersion,
+      }, 0));
+      await runNextAlarm();
+
+      creator.clearMessages();
+      const firstQuestion = questions[0];
+      await creator.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: firstQuestion.id,
+        questionVersion: 0,
+        optionId: firstQuestion.correctOptionId,
+      }, 0));
+
+      expect(creator.getAllMessages().find(
+        message => message.type === ServerEventType.ANSWER_ACCEPTED,
+      )).toBeDefined();
+      const progress = creator.getAllMessages().find(
+        message => message.type === ServerEventType.ROUND_PROGRESS,
+      );
+      expect(progress?.payload.answeredCount).toBe(1);
+
+      await room.webSocketClose(creatorServer as any, 1000, 'player network lost');
+      expect(ctx.getWebSockets('role:host')[0].readyState).toBe(1);
+
+      await room.fetch(new Request('http://internal/ws?role=player', {
+        headers: { Upgrade: 'websocket' },
+      }));
+      const resumedServer = ctx.getWebSockets('role:player').at(-1)!;
+      const resumed = attachTestClient(room, resumedServer, resumedServer.peer!);
+      await resumed.send(createClientEnvelope('RESUME_SESSION', {
+        pin: testPin,
+        reconnectToken,
+      }, 0));
+
+      const resumedAccepted = resumed.getAllMessages().find(
+        message => message.type === ServerEventType.SESSION_ACCEPTED,
+      );
+      const resumedSnapshot = resumed.getAllMessages().find(
+        message => message.type === ServerEventType.SNAPSHOT,
+      );
+      expect(resumedAccepted?.payload.playerId).toBe(playerId);
+      expect(resumedSnapshot?.payload.players.filter(
+        (player: { playerId: string }) => player.playerId === playerId,
+      )).toHaveLength(1);
+      expect(resumedSnapshot?.payload.personalAnswers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ questionId: firstQuestion.id })]),
+      );
+      expect(resumedSnapshot?.payload.personalScore.totalPoints).toBeGreaterThan(0);
+
+      await room.webSocketClose(hostServer as any, 1000, 'host network lost');
+      resumed.clearMessages();
+      await resumed.send(createClientEnvelope('REQUEST_SNAPSHOT', { lastRoomVersion: 0 }, 0));
+      expect(resumed.getAllMessages().find(
+        message => message.type === ServerEventType.SNAPSHOT,
+      )).toBeDefined();
+
+      await runNextAlarm();
+      await runNextAlarm();
+      await runNextAlarm();
+
+      for (let questionIndex = 1; questionIndex < 9; questionIndex++) {
+        const question = questions[questionIndex];
+        await resumed.send(createClientEnvelope('SUBMIT_ANSWER', {
+          questionId: question.id,
+          questionVersion: questionIndex,
+          optionId: question.correctOptionId,
+        }, 0));
+        await runNextAlarm();
+        await runNextAlarm();
+        await runNextAlarm();
+      }
+
+      const finalQuestion = questions[9];
+      await resumed.send(createClientEnvelope('SUBMIT_ANSWER', {
+        questionId: finalQuestion.id,
+        questionVersion: 9,
+        optionId: finalQuestion.correctOptionId,
+      }, 0));
+      await runNextAlarm();
+      await runNextAlarm();
+      expect((room as any).room.status).toBe(GameState.PODIUM);
+
+      resumed.clearMessages();
+      await resumed.send(createClientEnvelope('REQUEST_SNAPSHOT', { lastRoomVersion: 0 }, 0));
+      const podiumSnapshot = resumed.getAllMessages().find(
+        message => message.type === ServerEventType.SNAPSHOT,
+      );
+      expect(podiumSnapshot?.payload.rankings[0].playerId).toBe(playerId);
+      expect(podiumSnapshot?.payload.podium[0].playerId).toBe(playerId);
+    });
+  });
 });
