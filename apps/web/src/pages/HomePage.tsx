@@ -108,13 +108,21 @@ export const HomePage: React.FC = () => {
 
       <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col justify-between z-10">
         {/* Brand Top Header */}
-        <BrandHeader showArenaStatus={false} />
+        <BrandHeader
+          showArenaStatus={false}
+          className={step === 'welcome' ? 'hidden lg:flex' : ''}
+        />
 
         {/* ========================================================
             TELA 1 — ABERTURA
            ======================================================== */}
         {step === 'welcome' && (
-          <main className="w-full my-auto py-3 sm:py-6 lg:py-10 animate-[fadeInScale_0.3s_ease-out]">
+          <main className="w-full mt-0 mb-auto pt-24 pb-3 sm:pt-24 sm:pb-6 lg:my-auto lg:py-10 animate-[fadeInScale_0.3s_ease-out]">
+            {/* Mobile brand mark */}
+            <div className="lg:hidden w-full flex justify-center mb-6 -translate-y-8">
+              <BovinoEquinoEmblem size="sm" />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-center">
               {/* Left Column: Hero Text & Main CTA */}
               <div className="lg:col-span-7 flex flex-col items-start space-y-4 sm:space-y-6">
@@ -134,11 +142,6 @@ export const HomePage: React.FC = () => {
                 <p className="text-sm sm:text-base text-slate-300 max-w-md font-normal leading-relaxed">
                   Bovino × Equino em uma disputa rápida para jogar em grupo.
                 </p>
-
-                {/* Mobile Emblem position */}
-                <div className="lg:hidden w-full flex justify-center py-2">
-                  <BovinoEquinoEmblem size="sm" />
-                </div>
 
                 {/* Dominant Action CTA */}
                 <div className="w-full sm:w-auto flex flex-col items-start space-y-3 pt-1 sm:pt-2">
