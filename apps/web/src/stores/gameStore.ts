@@ -153,8 +153,10 @@ const initialState = {
   },
 };
 
-export const useGameStore = create<GameStoreState>((set, get) => ({
-  ...initialState,
+export const useGameStore = create<GameStoreState>((set, get, api) => {
+  api.getInitialState = () => api.getState();
+  return {
+    ...initialState,
 
   setPin: (pin) => set({ pin }),
   setHostData: (data) => set({ 
@@ -536,4 +538,5 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   }),
 
   resetStore: () => set(initialState),
-}));
+  };
+});

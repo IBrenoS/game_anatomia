@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ServerEventType } from '@batalha/protocol';
+import { getWebSocketManager } from '../lib/ws.js';
 import { useGameStore } from '../stores/gameStore.js';
 import { useGameSocket } from '../hooks/useGameSocket.js';
 import { getHostParticipation } from '../lib/hostParticipation.js';
@@ -92,6 +93,7 @@ export function HostPage() {
     roomState &&
       roomState !== 'LOBBY'
   );
+  const pauseModalIsOpen = roomState === 'PAUSED';
 
   // Sync body and documentElement background color based on game state (dark for pre-game lobby, ivory for gameplay)
   useEffect(() => {
@@ -183,6 +185,12 @@ export function HostPage() {
     </div>
   );
 
+  const handleHostResume = () => {
+    if (hostSocket.connectionState !== 'connected') return;
+    const hostManager = getWebSocketManager('host');
+    hostManager.sendHostCommand('RESUME', hostManager.roomVersion);
+  };
+
   const renderContent = () => {
     if (competitiveView) {
       switch (roomState) {
@@ -201,6 +209,9 @@ export function HostPage() {
               roomState={roomState}
               remainingMs={remainingMs}
               answerRejected={answerRejected}
+              isHost={true}
+              onResume={handleHostResume}
+              onResumeDisabled={hostSocket.connectionState !== 'connected'}
             />
           );
         case 'QUESTION_REVEAL':
@@ -234,6 +245,8 @@ export function HostPage() {
             currentQuestionIndex={currentQuestionIndex}
             startedAt={startedAt}
             deadlineAt={deadlineAt}
+            onResume={handleHostResume}
+            onResumeDisabled={hostSocket.connectionState !== 'connected'}
           />
         );
       case 'QUESTION_REVEAL':
@@ -298,7 +311,11 @@ export function HostPage() {
       </main>
 
       {/* Secondary ivory controls bar */}
-      <footer className="px-2.5 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/95 backdrop-blur-xs border-t border-[#E2DDD2]/70 shrink-0 z-20">
+      <footer
+        className="px-2.5 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/95 backdrop-blur-xs border-t border-[#E2DDD2]/70 shrink-0 z-20"
+        inert={pauseModalIsOpen || undefined}
+        aria-hidden={pauseModalIsOpen || undefined}
+      >
         <HostControls roomState={roomState} adminConnectionState={hostSocket.connectionState} />
       </footer>
     </div>

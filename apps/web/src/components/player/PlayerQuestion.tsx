@@ -17,6 +17,9 @@ interface PlayerQuestionProps {
   answerRejected?: { code: string; message: string } | null;
   layout?: 'auto' | 'complementary' | 'protagonist';
   protagonist?: boolean;
+  isHost?: boolean;
+  onResume?: () => void;
+  onResumeDisabled?: boolean;
 }
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
@@ -56,6 +59,9 @@ export default function PlayerQuestion({
   answerRejected: propAnswerRejected,
   layout,
   protagonist,
+  isHost = false,
+  onResume,
+  onResumeDisabled = false,
 }: PlayerQuestionProps) {
   const [optimisticOptionId, setOptimisticOptionId] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -100,6 +106,7 @@ export default function PlayerQuestion({
     answerSubmitted || ((selectedOptionId || optimisticOptionId) && !answerRejected)
   );
   const interactionLocked = roomState !== 'QUESTION_ACTIVE' || hasRecordedAnswer;
+  const canResume = Boolean(isHost && onResume);
 
   const handleSelectOption = (optionId: string) => {
     if (interactionLocked) return;
@@ -203,7 +210,7 @@ export default function PlayerQuestion({
                 ? 'bg-white border-2 border-[#123829] shadow-lg ring-2 ring-[#123829]/20 scale-[1.01]'
                 : interactionLocked
                 ? 'bg-[#FAF8F3] border-[#E2DDD2] opacity-60 cursor-default'
-                : 'bg-white hover:bg-[#F7F5EE] border-[#E2DDD2] hover:border-[#CBD5E1] shadow-xs cursor-pointer active:scale-[0.99]'
+                : 'bg-white hover:bg-[#F7F5EE] border-[#E2DDD2] hover:border-[#CBD5E1] shadow-xs cursor-pointer active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#123829] focus-visible:ring-offset-2'
             } border-l-[6px] ${isSelected ? 'border-l-[#123829]' : theme.borderAccent}`}
             aria-label={`Alternativa ${letter}: ${option.label}`}
             aria-pressed={isSelected}
@@ -295,14 +302,35 @@ export default function PlayerQuestion({
               Rodada pausada
             </div>
             <p className="text-xs sm:text-sm font-bold text-[#D05F36] mb-2">
-              {`Partida pausada pelo apresentador. O cronômetro está congelado${remainingMs !== null ? ` em ${Math.ceil((remainingMs || 0) / 1000)}s.` : '.'}`}
+              {canResume
+                ? `Você pausou a partida. O cronômetro está congelado${remainingMs !== null ? ` em ${Math.ceil((remainingMs || 0) / 1000)}s.` : '.'}`
+                : `Partida pausada pelo apresentador. O cronômetro está congelado${remainingMs !== null ? ` em ${Math.ceil((remainingMs || 0) / 1000)}s.` : '.'}`}
             </p>
             <p className="text-xs text-[#555E57] leading-relaxed mb-4">
-              Quando a rodada voltar, você poderá responder normalmente. A rodada continua do mesmo ponto quando o apresentador retomar.
+              {canResume
+                ? 'A rodada está suspensa temporariamente. Clique no botão abaixo para retomar a partida do mesmo ponto.'
+                : 'Quando a rodada voltar, você poderá responder normalmente. A rodada continua do mesmo ponto quando o apresentador retomar.'}
             </p>
-            <span className="inline-block text-[11px] font-bold text-[#64748B] bg-[#FAF8F3] border border-[#E2DDD2] px-3 py-1 rounded-full">
-              Rodada suspensa temporariamente
-            </span>
+            {canResume ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={onResume}
+                  disabled={onResumeDisabled}
+                  className="w-full py-3 px-5 bg-[#123829] hover:bg-[#1B4D3E] disabled:bg-slate-400 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
+                  aria-label="Retomar Rodada - Retomar Partida"
+                >
+                  <span>▶</span> Retomar Partida
+                </button>
+                <span className="text-[11px] font-semibold text-[#64748B]">
+                  Contagem regressiva de 3s antecede a retomada
+                </span>
+              </div>
+            ) : (
+              <span className="inline-block text-[11px] font-bold text-[#64748B] bg-[#FAF8F3] border border-[#E2DDD2] px-3 py-1 rounded-full">
+                Rodada suspensa temporariamente
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -348,39 +376,46 @@ export default function PlayerQuestion({
 
       {/* Question Content & Alternatives */}
       {isComplementary ? (
-        /* P04: Desktop Complementary (2 columns on lg, stacked on mobile) */
-        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-2.5 sm:gap-6 lg:items-center min-h-0 my-auto">
-          {/* Left Column (Desktop complementary media card) */}
-          <div className="hidden lg:flex lg:col-span-5 h-full items-center justify-center">
-            {renderMediaCard('complementary')}
+        /* P04: Desktop Complementary (Prompt above, then 2 columns on lg; stacked on mobile) */
+        <div className="flex-1 flex flex-col min-h-0 my-auto justify-between overflow-y-auto sm:overflow-visible">
+          {/* Desktop prompt: Centered across top above both columns matching slice_03.png */}
+          <h2 className="hidden lg:block text-lg md:text-xl lg:text-2xl font-black text-[#122017] my-2 sm:my-3 leading-snug tracking-tight text-center">
+            {question.prompt}
+          </h2>
+
+          {/* Mobile stacked media (always above prompt on mobile per Section 5 priority) */}
+          <div className="lg:hidden shrink-0">
+            {renderMediaCard('mobile')}
           </div>
 
-          {/* Right Column (Question prompt & Alternatives) */}
-          <div className="col-span-1 lg:col-span-7 flex flex-col justify-between flex-1 lg:h-full min-h-0 overflow-y-auto sm:overflow-visible">
-            {/* Mobile stacked media (always above prompt on mobile) */}
-            <div className="lg:hidden shrink-0">
-              {renderMediaCard('mobile')}
+          {/* Mobile prompt (below media) */}
+          <h2 className="lg:hidden text-sm sm:text-base font-black text-[#122017] my-1 leading-snug tracking-tight">
+            {question.prompt}
+          </h2>
+
+          {/* Split Content: Media on Left, Alternatives on Right on Desktop */}
+          <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 gap-2.5 sm:gap-6 lg:items-center min-h-0 my-auto">
+            {/* Left Column (Desktop complementary media card) */}
+            <div className="hidden lg:flex lg:col-span-5 h-full items-center justify-center">
+              {renderMediaCard('complementary')}
             </div>
 
-            {/* Prompt */}
-            <h2 className="text-sm sm:text-base md:text-lg lg:text-xl font-black text-[#122017] my-1 sm:my-2 leading-snug tracking-tight">
-              {question.prompt}
-            </h2>
+            {/* Right Column (Status banner, Rejections, Alternatives in split layout matching slice_05.png) */}
+            <div className="col-span-1 lg:col-span-7 flex flex-col justify-center flex-1 min-h-0">
+              {/* Status Banner when Answer Recorded (P05) */}
+              {renderAnswerStatus()}
 
-            {/* Status Banner when Answer Recorded (P05) */}
-            {renderAnswerStatus()}
+              {/* Rejection Notification if any */}
+              {renderRejection()}
 
-            {/* Rejection Notification if any */}
-            {renderRejection()}
-
-            {/* Alternatives List (1 column in split layout) */}
-            <div className="my-auto py-1">
-              {renderAlternatives(1)}
+              <div className="my-auto py-1">
+                {renderAlternatives(1)}
+              </div>
             </div>
-
-            {/* Footer guidance */}
-            {renderFooter()}
           </div>
+
+          {/* Footer guidance */}
+          {renderFooter()}
         </div>
       ) : isProtagonist ? (
         /* P04B: Desktop Protagonist (wide central hero media + 2x2 grid on desktop, stacked on mobile) */

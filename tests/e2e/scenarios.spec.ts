@@ -109,15 +109,19 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await expect(pauseBtn).toBeVisible({ timeout: 5000 });
     await pauseBtn.click();
 
-    // Host should now see "Retomar Rodada"
-    const resumeBtn = hostPage.getByRole('button', { name: /retomar rodada/i });
+    // The paused host sees a single modal action; the footer stays frozen underneath.
+    const pauseDialog = hostPage.getByRole('dialog', { name: /partida pausada/i });
+    await expect(pauseDialog).toBeVisible({ timeout: 5000 });
+    const resumeBtn = pauseDialog.getByRole('button', { name: /retomar rodada/i });
     await expect(resumeBtn).toBeVisible({ timeout: 5000 });
+    await expect(hostPage.getByRole('button', { name: /finalizar partida/i })).toHaveCount(0);
+    await expect(hostPage.getByRole('button', { name: /alternar áudio local/i })).toHaveCount(0);
 
     // T34/T35: pause is mechanical in all frontends, not only rejected server-side.
     await expect(playerPage.getByRole('status').filter({ hasText: /rodada pausada/i })).toBeVisible();
     const answerButtons = playerPage.getByRole('button', { name: /alternativa/i });
     await expect(answerButtons.first()).toBeDisabled();
-    await expect(hostPage.getByRole('status').filter({ hasText: /cronômetro congelado/i })).toBeVisible();
+    await expect(pauseDialog.getByText(/cronômetro está congelado/i)).toBeVisible();
     await expect(screenPage.getByRole('status').filter({ hasText: /cronômetro congelado/i })).toBeVisible();
     const frozenTimer = await playerPage.getByLabel(/tempo restante/i).textContent();
     await playerPage.waitForTimeout(1200);
@@ -265,16 +269,69 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     // 2. Host ends question prematurely
     const endQBtn = hostPage.getByRole('button', { name: /encerrar questão/i });
     await expect(endQBtn).toBeVisible({ timeout: 5000 });
+    const scrollHeightBeforeConfirmation = await hostPage.evaluate(() => document.documentElement.scrollHeight);
     await endQBtn.click();
 
-    // Confirm dialog
-    const confirmBtn = hostPage.getByRole('button', { name: /sim, encerrar/i });
+    // Confirmation freezes the viewport in a centered modal without changing page height.
+    const confirmationDialog = hostPage.getByRole('alertdialog', { name: /encerrar questão/i });
+    await expect(confirmationDialog).toBeVisible({ timeout: 5000 });
+    await expect.poll(() => hostPage.evaluate(() => document.documentElement.scrollHeight)).toBe(scrollHeightBeforeConfirmation);
+    const dialogBox = await confirmationDialog.boundingBox();
+    const viewport = hostPage.viewportSize();
+    expect(dialogBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(Math.abs((dialogBox!.y + dialogBox!.height / 2) - viewport!.height / 2)).toBeLessThan(8);
+
+    const confirmBtn = confirmationDialog.getByRole('button', { name: /sim, encerrar/i });
     await expect(confirmBtn).toBeVisible({ timeout: 5000 });
     await confirmBtn.click();
 
     // Should transition to reveal
     await expect(hostPage.getByText(/gabarito da rodada/i)).toBeVisible({ timeout: 8000 });
     await expect(hostPage.getByText(/avanço automático/i)).toBeVisible({ timeout: 8000 });
+
+    await hostContext.close();
+    await playerContext.close();
+  });
+
+  test('Scenario 6b: Confirmação de finalizar partida centraliza e cancelar preserva a questão', async ({ browser }) => {
+    const hostContext = await browser.newContext();
+    const hostPage = await hostContext.newPage();
+    await hostPage.goto('/host');
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
+    await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
+    const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
+
+    const playerContext = await browser.newContext();
+    const playerPage = await playerContext.newPage();
+    await playerPage.goto(`/join/${pin}`);
+    await playerPage.getByLabel(/seu apelido/i).fill('GameFinisher');
+    await playerPage.getByRole('button', { name: /entrar na arena/i }).click();
+    await expect(playerPage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
+
+    await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
+    await expect(hostPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
+
+    const finishBtn = hostPage.getByRole('button', { name: /finalizar partida/i });
+    await expect(finishBtn).toBeVisible({ timeout: 5000 });
+    await finishBtn.click();
+
+    const confirmationDialog = hostPage.getByRole('alertdialog', { name: /encerrar partida/i });
+    await expect(confirmationDialog).toBeVisible({ timeout: 5000 });
+    const dialogBox = await confirmationDialog.boundingBox();
+    const viewport = hostPage.viewportSize();
+    expect(dialogBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(Math.abs((dialogBox!.y + dialogBox!.height / 2) - viewport!.height / 2)).toBeLessThan(8);
+
+    await confirmationDialog.getByRole('button', { name: /voltar/i }).click();
+    await expect(confirmationDialog).toHaveCount(0);
+    await expect(hostPage.getByText(/questão 1 de 15/i)).toBeVisible();
+
+    await finishBtn.click();
+    await confirmationDialog.getByRole('button', { name: /finalizar agora/i }).click();
+    await expect(hostPage.getByText(/partida encerrada/i)).toBeVisible({ timeout: 8000 });
 
     await hostContext.close();
     await playerContext.close();

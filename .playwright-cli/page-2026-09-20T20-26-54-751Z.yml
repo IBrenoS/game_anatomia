@@ -1,0 +1,33 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]: BATALHA ANATÔMICA
+      - generic [ref=e8]: BOVINO × EQUINO
+  - main [ref=e9]:
+    - generic [ref=e10]:
+      - heading "Criar nova batalha" [level=1] [ref=e11]
+      - paragraph [ref=e12]: Como você vai participar?
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - button "Também vou jogar Você cria e compete. ✓ SELECIONADO" [pressed] [ref=e15] [cursor=pointer]:
+          - generic [ref=e17]:
+            - heading "Também vou jogar" [level=3] [ref=e18]
+            - paragraph [ref=e19]: Você cria e compete.
+          - generic [ref=e23]:
+            - generic [ref=e24]: ✓
+            - text: SELECIONADO
+        - button "Só vou apresentar Você controla sem competir. Selecionar" [ref=e25] [cursor=pointer]:
+          - generic [ref=e27]:
+            - heading "Só vou apresentar" [level=3] [ref=e28]
+            - paragraph [ref=e29]: Você controla sem competir.
+          - generic [ref=e31]: Selecionar
+      - generic [ref=e32]:
+        - generic [ref=e33]: Seu nome
+        - textbox "Seu nome" [ref=e35]:
+          - /placeholder: "Ex.: Breno"
+        - paragraph [ref=e36]: Seu nome aparecerá no ranking e no pódio.
+      - button "Criar partida" [disabled] [ref=e38]:
+        - generic [ref=e40]: →
+    - button "← Voltar" [ref=e42] [cursor=pointer]:
+      - generic [ref=e43]: ←
+      - generic [ref=e44]: Voltar

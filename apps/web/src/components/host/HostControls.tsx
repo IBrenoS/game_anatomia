@@ -81,6 +81,8 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
               type="button"
               onClick={() => handleCommand('PAUSE')}
               className="px-3.5 py-1.5 bg-[#C95A34] hover:bg-[#B04A27] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+              aria-label="Pausar Rodada"
+              title="Pausar Rodada"
             >
               ⏸ Pausar
             </button>
@@ -107,8 +109,10 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
               type="button"
               onClick={() => handleCommand('RESUME')}
               className="px-3.5 py-1.5 bg-[#123829] hover:bg-[#1B4D3E] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+              aria-label="Retomar Rodada - Retomar Partida"
+              title="Retomar Partida"
             >
-              ▶ Retomar
+              ▶ Retomar Partida
             </button>
             <button 
               type="button"

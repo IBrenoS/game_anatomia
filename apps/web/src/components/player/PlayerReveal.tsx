@@ -108,8 +108,10 @@ export default function PlayerReveal({
   }
 
   const { correct, awardedPoints, responseTimeMs } = result;
-  const hasSpeedBonus = correct && (responseTimeMs <= 10000 || awardedPoints > basePoints);
-  const bonusPoints = Math.max(0, awardedPoints - basePoints);
+  const rawBonus = awardedPoints - basePoints;
+  const effectiveBonus = rawBonus > 0 ? rawBonus : Math.round(basePoints * 0.25);
+  const effectiveBase = awardedPoints >= effectiveBonus ? awardedPoints - effectiveBonus : basePoints;
+  const hasSpeedBonus = correct && (rawBonus > 0 || responseTimeMs <= 10000);
   const responseTimeSec = (responseTimeMs / 1000).toFixed(2);
 
   return (
@@ -173,12 +175,51 @@ export default function PlayerReveal({
                       Pontuação acumulada: {`TOTAL ${totalPoints} pts`}
                     </div>
                   </div>
+
+                  {/* Visual Speed Bonus Breakdown Equation: PONTOS BASE + BÔNUS DE RAPIDEZ = TOTAL */}
+                  <div className="mt-3 pt-3 border-t border-[#E2DDD2]/70 grid grid-cols-5 items-center text-center text-xs">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold text-[#64748B] tracking-wider">
+                        PONTOS BASE
+                      </span>
+                      <span className="font-mono font-black text-xs sm:text-sm text-[#122017] mt-0.5">
+                        {`${effectiveBase} pts`}
+                      </span>
+                    </div>
+
+                    <span className="font-mono font-black text-sm sm:text-base text-[#D48B28]">+</span>
+
+                    <div className="flex flex-col items-center">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-black text-[#B45309] tracking-wider">
+                        BÔNUS RAPIDEZ
+                      </span>
+                      <span className="font-mono font-black text-xs sm:text-sm text-[#B45309] mt-0.5">
+                        {`+${effectiveBonus} pts`}
+                      </span>
+                    </div>
+
+                    <span className="font-mono font-black text-sm sm:text-base text-[#D48B28]">=</span>
+
+                    <div className="flex flex-col items-center">
+                      <span className="text-[9px] sm:text-[10px] uppercase font-bold text-[#123829] tracking-wider">
+                        TOTAL RODADA
+                      </span>
+                      <span className="font-mono font-black text-xs sm:text-sm text-[#123829] mt-0.5">
+                        {`+${awardedPoints} pts`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-[#E2DDD2]/40 flex justify-between items-center px-1 text-[11px] font-bold text-[#555E57]">
+                    <span>Nova Pontuação Acumulada:</span>
+                    <span className="font-mono font-black text-[#122017]">{totalPoints} pts</span>
+                  </div>
                 </div>
               </div>
 
               {/* Speed bonus callout pill */}
               <div className="w-full max-w-md bg-[#FEF9EE] border border-[#F59E0B]/60 text-[#B45309] rounded-2xl py-2.5 px-4 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs my-2 animate-gold-glow">
-                <span>{`⚡ +${bonusPoints > 0 ? bonusPoints : Math.round(basePoints * 0.25)} pts por velocidade`}</span>
+                <span>{`⚡ +${effectiveBonus} pts por velocidade`}</span>
               </div>
 
               {/* Correct Option Display */}
@@ -289,9 +330,6 @@ export default function PlayerReveal({
                 <div className="mt-2 pt-2 border-t border-[#E2DDD2] flex items-center gap-1.5">
                   <span className="text-[10px] uppercase font-black tracking-wider text-[#2D8058] bg-[#EAF5EC] px-2 py-0.5 rounded-full border border-[#2D8058]/30">
                     RESPOSTA CORRETA
-                  </span>
-                  <span className="text-[11px] text-[#64748B] font-medium">
-                    Revise o gabarito antes do ranking
                   </span>
                 </div>
               </div>

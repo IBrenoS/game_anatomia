@@ -11,6 +11,7 @@ export default function CountdownDisplay({ mode = 'player', onComplete }: Countd
   const startedAt = useGameStore((s) => s.startedAt);
   const deadlineAt = useGameStore((s) => s.deadlineAt);
   const countdownStartedAt = useGameStore((s) => s.countdownStartedAt);
+  const countdownKind = useGameStore((s) => s.countdownKind);
 
   // Effective start and end times
   const effectiveStart = countdownStartedAt || startedAt || Date.now();
@@ -45,10 +46,11 @@ export default function CountdownDisplay({ mode = 'player', onComplete }: Countd
   }, [effectiveDeadline, onComplete]);
 
   if (mode === 'screen') {
+    const isResume = countdownKind === 'RESUME';
     return (
       <div className="flex-1 flex flex-col items-center justify-center select-none text-center p-8">
         <span className="text-2xl md:text-3xl font-bold uppercase tracking-widest text-blue-300 bg-blue-950/60 px-8 py-2 rounded-full border border-blue-400/30 mb-8 animate-pulse">
-          Prepare-se!
+          {isResume ? 'Retomando Partida!' : 'Prepare-se!'}
         </span>
 
         <div className="relative flex items-center justify-center my-6">
@@ -63,7 +65,7 @@ export default function CountdownDisplay({ mode = 'player', onComplete }: Countd
         </div>
 
         <p className="text-3xl font-medium text-blue-200 mt-8">
-          A próxima questão vai começar!
+          {isResume ? 'A rodada continuará de onde parou!' : 'A próxima questão vai começar!'}
         </p>
       </div>
     );

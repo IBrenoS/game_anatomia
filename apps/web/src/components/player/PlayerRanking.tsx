@@ -77,12 +77,12 @@ export default function PlayerRanking({
                 <span>Assumiu a liderança</span>
               </div>
             ) : prevEntry && delta > 0 ? (
-              <div className="bg-[#EAF5EC] text-[#2D8058] border border-[#2D8058]/30 text-xs font-black px-3.5 py-1 rounded-full shadow-xs flex items-center gap-1.5 animate-scale-in">
+              <div className="bg-[#EAF5EC] text-[#2D8058] border border-[#2D8058]/30 text-xs font-black px-3.5 py-1 rounded-full shadow-xs flex items-center gap-1.5 animate-rank-up">
                 <span>↑</span>
                 <span>{`Subiu ${delta} ${delta === 1 ? 'posição' : 'posições'}`}</span>
               </div>
             ) : prevEntry && delta < 0 ? (
-              <div className="bg-[#FBEBE8] text-[#C95A34] border border-[#C95A34]/30 text-xs font-black px-3.5 py-1 rounded-full shadow-xs flex items-center gap-1.5 animate-scale-in">
+              <div className="bg-[#FBEBE8] text-[#C95A34] border border-[#C95A34]/30 text-xs font-black px-3.5 py-1 rounded-full shadow-xs flex items-center gap-1.5 animate-rank-down">
                 <span>↓</span>
                 <span>{`Caiu ${Math.abs(delta)} ${Math.abs(delta) === 1 ? 'posição' : 'posições'}`}</span>
               </div>

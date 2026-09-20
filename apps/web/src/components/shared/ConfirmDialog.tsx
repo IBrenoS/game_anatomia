@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -21,18 +22,45 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   isDestructive = false,
 }) => {
+  const titleId = useId();
+  const messageId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCancel();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    cancelButtonRef.current?.focus();
+
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onCancel]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-[fadeInScale_0.2s_ease-out]">
+  const dialog = (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={messageId}
+      className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-[fadeInScale_0.2s_ease-out]"
+    >
       <div className="bg-[#0E1522] rounded-2xl shadow-2xl border border-white/15 w-full max-w-md overflow-hidden select-none">
         <div className="p-6">
-          <h3 className="text-lg sm:text-xl font-black text-white mb-2">{title}</h3>
-          <p className="text-sm text-slate-300 leading-relaxed">{message}</p>
+          <h3 id={titleId} className="text-lg sm:text-xl font-black text-white mb-2">{title}</h3>
+          <p id={messageId} className="text-sm text-slate-300 leading-relaxed">{message}</p>
         </div>
         <div className="bg-black/30 px-6 py-4 flex justify-end gap-3 border-t border-white/10">
           <button
             type="button"
+            ref={cancelButtonRef}
             onClick={onCancel}
             className="px-4 py-2 rounded-xl font-bold text-xs sm:text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
@@ -53,6 +81,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       </div>
     </div>
   );
+
+  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body);
 };
 
 export default ConfirmDialog;

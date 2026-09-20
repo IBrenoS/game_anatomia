@@ -98,6 +98,7 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
       previousRankings: [],
       answerRejected: null,
       remainingMs: null,
+      countdownKind: null,
     });
   });
 
@@ -120,6 +121,7 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     useGameStore.setState({
       startedAt: Date.now(),
       deadlineAt: Date.now() + 3000,
+      countdownKind: 'NEXT_QUESTION',
     });
     const html = renderToString(React.createElement(PlayerCountdown));
 
@@ -128,6 +130,20 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(html).toContain('Respire.');
     expect(html).toContain('Observe.');
     expect(html).toContain('Responda.');
+  });
+
+  it('P02-RESUME: renders Countdown with "RETOMANDO RODADA" and resume guidance when countdownKind is RESUME', () => {
+    useGameStore.setState({
+      startedAt: Date.now(),
+      deadlineAt: Date.now() + 3000,
+      countdownKind: 'RESUME',
+    });
+    const html = renderToString(React.createElement(PlayerCountdown));
+
+    expect(html).toContain('RETOMANDO RODADA');
+    expect(html).toContain('Fique pronto.');
+    expect(html).toContain('A rodada continuará do mesmo ponto. Olhos na pergunta.');
+    expect(html).not.toContain('PRÓXIMA QUESTÃO');
   });
 
   // P03: Active Question without Image
@@ -291,6 +307,9 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(html).toContain('+375');
     expect(html).toContain('BÔNUS DE VELOCIDADE +25%');
     expect(html).toContain('pts por velocidade');
+    expect(html).toContain('PONTOS BASE');
+    expect(html).toContain('BÔNUS RAPIDEZ');
+    expect(html).toContain('TOTAL RODADA');
   });
 
   // P09: Feedback Incorreto
@@ -315,6 +334,7 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(html).toContain('+0');
     expect(html).toContain('RESPOSTA CORRETA');
     expect(html).toContain('Auxiliar na sustentação e movimentação do dorso');
+    expect(html).not.toContain('Revise o gabarito antes do ranking');
   });
 
   // P10: Feedback Tempo Esgotado
@@ -566,6 +586,10 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     const countdownHtml = renderToString(React.createElement(PlayerCountdown));
     expect(countdownHtml).not.toContain('rounded-3xl p-6 shadow-2xl');
 
+    const lobbyHtml = renderToString(React.createElement(PlayerLobby, { nickname: 'Hsu', totalPlayers: 4 }));
+    expect(lobbyHtml).not.toContain('rounded-3xl p-6 shadow-2xl');
+    expect(lobbyHtml).not.toContain('rounded-3xl p-6 sm:p-10 shadow-2xl');
+
     const revealHtml = renderToString(
       React.createElement(PlayerReveal, {
         result: { correct: true, awardedPoints: 100, responseTimeMs: 5000, selectedOptionId: 'opt-1' },
@@ -646,12 +670,13 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(html).toContain('gap-2 sm:gap-3');
   });
 
-  // P22: PlayerPage Shell Architecture (Pre-game renders dark arena shell without gameplay canvas)
-  it('P22: PlayerPage pre-game shell renders dark-arena-bg without gameplay-canvas #FAF8F3', () => {
+  // P22: PlayerPage Shell Architecture (Pre-game connection is dark; arena gameplay/lobby is full ivory canvas)
+  it('P22: PlayerPage pre-game connection renders dark-arena-bg; connected arena lobby renders gameplay-canvas #FAF8F3', () => {
     const playerManager = getWebSocketManager('player') as any;
-    playerManager._state = 'connected';
-
-    const pageHtml = renderToString(
+    
+    // 1. Pre-game connection phase is dark arena
+    playerManager._state = 'connecting';
+    const connectingHtml = renderToString(
       React.createElement(
         MemoryRouter,
         { initialEntries: ['/play/123456'] },
@@ -662,9 +687,27 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
         )
       )
     );
-    expect(pageHtml).toContain('dark-arena-bg');
-    expect(pageHtml).not.toContain('gameplay-canvas');
-    expect(pageHtml).not.toContain('bg-[#FAF8F3]');
+    expect(connectingHtml).toContain('dark-arena-bg');
+    expect(connectingHtml).toContain('Conectando à arena...');
+    expect(connectingHtml).not.toContain('gameplay-canvas');
+
+    // 2. Connected Player Surface (Lobby through all gameplay states) assumes full-viewport ivory canvas
+    playerManager._state = 'connected';
+    useGameStore.setState({ roomState: 'LOBBY', totalPlayers: 4, nickname: 'Hsu' });
+    const arenaHtml = renderToString(
+      React.createElement(
+        MemoryRouter,
+        { initialEntries: ['/play/123456'] },
+        React.createElement(
+          Routes,
+          null,
+          React.createElement(Route, { path: '/play/:pin', element: React.createElement(PlayerPage) })
+        )
+      )
+    );
+    expect(arenaHtml).toContain('gameplay-canvas');
+    expect(arenaHtml).toContain('bg-[#FAF8F3]');
+    expect(arenaHtml).not.toContain('dark-arena-bg');
   });
 
   // P23: HostPage Shell Architecture (Pre-game renders dark arena shell without gameplay canvas)
@@ -683,5 +726,95 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(hostHtml).toContain('bg-[#080C11]');
     expect(hostHtml).not.toContain('gameplay-canvas');
     expect(hostHtml).not.toContain('bg-[#FAF8F3]');
+  });
+
+  // P24: Speed Bonus Visual Equation (Section 12 audit)
+  it('P24: PlayerReveal explains speed bonus with base points + bonus = total round equation', () => {
+    const mockResult: PersonalResult = {
+      correct: true,
+      awardedPoints: 250,
+      responseTimeMs: 3200,
+      selectedOptionId: 'opt-1',
+    };
+
+    const html = renderToString(
+      React.createElement(PlayerReveal, {
+        result: mockResult,
+        correctOptionId: 'opt-1',
+        question: mockBaseQuestion, // basePoints: 200
+      })
+    );
+
+    expect(html).toContain('PONTOS BASE');
+    expect(html).toContain('200 pts');
+    expect(html).toContain('BÔNUS RAPIDEZ');
+    expect(html).toContain('+50 pts');
+    expect(html).toContain('TOTAL RODADA');
+    expect(html).toContain('+250 pts');
+    expect(html).toContain('Nova Pontuação Acumulada');
+  });
+
+  // P25: PlayerCountdown 2-column Desktop Layout (Section 2 & 3 audit)
+  it('P25: PlayerCountdown renders 2-column balanced layout on desktop and stacked on mobile', () => {
+    useGameStore.setState({
+      startedAt: Date.now(),
+      deadlineAt: Date.now() + 3000,
+    });
+    const html = renderToString(React.createElement(PlayerCountdown));
+
+    expect(html).toContain('grid-cols-1 md:grid-cols-12');
+    expect(html).toContain('md:col-span-6');
+    expect(html).toContain('PRÓXIMA QUESTÃO');
+    expect(html).toContain('Fique pronto.');
+    expect(html).toContain('Respire.');
+  });
+
+  // P26: PlayerLobby 2-column Desktop Layout (Section 2 & 3 audit)
+  it('P26: PlayerLobby renders 2-column balanced layout on desktop with player roster card', () => {
+    const html = renderToString(React.createElement(PlayerLobby, { nickname: 'Mariana', totalPlayers: 8 }));
+
+    expect(html).toContain('grid-cols-1 md:grid-cols-12');
+    expect(html).toContain('md:col-span-7');
+    expect(html).toContain('md:col-span-5');
+    expect(html).toContain('Mariana, sua vaga está garantida.');
+    expect(html).toContain('8 jogadores conectados');
+    expect(html).toContain('Pronto para a batalha');
+  });
+
+  // P27: Ranking Motion Classes (Section 8 audit)
+  it('P27: PlayerRanking uses animate-rank-up on subiu and animate-rank-down on caiu', () => {
+    const prevSubiu = [{ position: 4, playerId: 'p1', nickname: 'Hsu', totalPoints: 300, correctCount: 2, correctResponseTimeMs: 8000, distanceToPrevious: 50 }];
+    const rankSubiu: RankingEntry = { position: 2, playerId: 'p1', nickname: 'Hsu', totalPoints: 500, correctCount: 3, correctResponseTimeMs: 10000, distanceToPrevious: 25 };
+    const htmlSubiu = renderToString(React.createElement(PlayerRanking, { ranking: rankSubiu, isFinal: false, previousRankings: prevSubiu }));
+    expect(htmlSubiu).toContain('animate-rank-up');
+    expect(htmlSubiu).toContain('Subiu 2 posições');
+
+    const prevCaiu = [{ position: 2, playerId: 'p1', nickname: 'Hsu', totalPoints: 500, correctCount: 3, correctResponseTimeMs: 10000, distanceToPrevious: 25 }];
+    const rankCaiu: RankingEntry = { position: 5, playerId: 'p1', nickname: 'Hsu', totalPoints: 500, correctCount: 3, correctResponseTimeMs: 10000, distanceToPrevious: 80 };
+    const htmlCaiu = renderToString(React.createElement(PlayerRanking, { ranking: rankCaiu, isFinal: false, previousRankings: prevCaiu }));
+    expect(htmlCaiu).toContain('animate-rank-down');
+    expect(htmlCaiu).toContain('Caiu 3 posições');
+  });
+
+  // P28: Desktop Complementary Layout Full-Width Prompt (Section 2 & 5 audit)
+  it('P28: PlayerQuestion complementary layout features full-width centered prompt above media and alternatives', () => {
+    const html = renderToString(
+      React.createElement(PlayerQuestion, {
+        question: mockQuestionWithMedia,
+        currentQuestionIndex: 2,
+        startedAt: 1000,
+        deadlineAt: 61000,
+        selectedOptionId: null,
+        answerSubmitted: false,
+        roomState: 'QUESTION_ACTIVE',
+        layout: 'complementary',
+      })
+    );
+
+    // Desktop prompt is placed above split grid with hidden lg:block
+    expect(html).toContain('hidden lg:block');
+    expect(html).toContain('lg:grid lg:grid-cols-12');
+    expect(html).toContain('lg:col-span-5');
+    expect(html).toContain('lg:col-span-7');
   });
 });

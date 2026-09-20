@@ -163,4 +163,74 @@ describe('PlayerQuestion UI Component (V32-T05A/B/C/D)', () => {
 
     expect(html).toContain('Questão 1 de 15');
   });
+
+  it('PAUSED com isHost=true e onResume exibe botão "Retomar Partida" e mensagem voltada ao host', () => {
+    const onResume = () => {};
+    const html = renderToString(
+      React.createElement(PlayerQuestion, {
+        question: mockQuestion,
+        currentQuestionIndex: 0,
+        startedAt: 1000,
+        deadlineAt: null,
+        selectedOptionId: null,
+        answerSubmitted: false,
+        roomState: 'PAUSED',
+        remainingMs: 19000,
+        isHost: true,
+        onResume,
+      })
+    );
+
+    expect(html).toContain('Partida pausada');
+    expect(html).toContain('Você pausou a partida');
+    expect(html).toContain('congelado em 19s');
+    expect(html).toContain('Retomar Partida');
+    expect(html).toContain('aria-label="Retomar Rodada - Retomar Partida"');
+    expect(html).not.toContain('Partida pausada pelo apresentador');
+  });
+
+  it('PAUSED para participante comum não exibe botão "Retomar Partida"', () => {
+    const html = renderToString(
+      React.createElement(PlayerQuestion, {
+        question: mockQuestion,
+        currentQuestionIndex: 0,
+        startedAt: 1000,
+        deadlineAt: null,
+        selectedOptionId: null,
+        answerSubmitted: false,
+        roomState: 'PAUSED',
+        remainingMs: 19000,
+        isHost: false,
+      })
+    );
+
+    expect(html).toContain('Partida pausada');
+    expect(html).toContain('Partida pausada pelo apresentador');
+    expect(html).toContain('congelado em 19s');
+    expect(html).not.toContain('Retomar Partida');
+    expect(html).toContain('Rodada suspensa temporariamente');
+  });
+
+  it('PAUSED com isHost=true mas sem onResume mantém cópia segura sem instruir clique em botão inexistente', () => {
+    const html = renderToString(
+      React.createElement(PlayerQuestion, {
+        question: mockQuestion,
+        currentQuestionIndex: 0,
+        startedAt: 1000,
+        deadlineAt: null,
+        selectedOptionId: null,
+        answerSubmitted: false,
+        roomState: 'PAUSED',
+        remainingMs: 19000,
+        isHost: true,
+        onResume: undefined,
+      })
+    );
+
+    expect(html).toContain('Partida pausada');
+    expect(html).toContain('Partida pausada pelo apresentador');
+    expect(html).not.toContain('Clique no botão abaixo para retomar');
+    expect(html).not.toContain('Retomar Partida');
+    expect(html).toContain('Rodada suspensa temporariamente');
+  });
 });

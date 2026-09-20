@@ -7,11 +7,19 @@ interface HostQuestionProps {
   currentQuestionIndex: number;
   startedAt: number | null;
   deadlineAt: number | null;
+  onResume?: () => void;
+  onResumeDisabled?: boolean;
 }
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
-export default function HostQuestion({ question, currentQuestionIndex, deadlineAt }: HostQuestionProps) {
+export default function HostQuestion({
+  question,
+  currentQuestionIndex,
+  deadlineAt,
+  onResume,
+  onResumeDisabled = false,
+}: HostQuestionProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const answeredCount = useGameStore((s) => s.answeredCount);
   const activeEligiblePlayers = useGameStore((s) => s.activeEligiblePlayers);
@@ -64,8 +72,49 @@ export default function HostQuestion({ question, currentQuestionIndex, deadlineA
       </div>
 
       {isPaused && (
-        <div role="status" className="mb-4 rounded-xl border border-[#D05F36]/30 bg-[#FBEBE8] px-4 py-2.5 text-center font-bold text-[#D05F36] text-xs sm:text-sm shadow-xs">
-          Rodada pausada — cronômetro congelado
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="host-pause-dialog-title"
+          className="fixed inset-0 bg-[#123829]/40 backdrop-blur-xs z-30 flex items-center justify-center p-4 animate-fade-in-scale"
+        >
+          <div className="bg-white border border-[#E2DDD2] rounded-3xl p-6 sm:p-8 text-center shadow-2xl max-w-sm w-full mx-auto animate-scale-in">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#D05F36] to-[#A8382B] text-white flex items-center justify-center mx-auto mb-3 shadow-md text-xl font-black">
+              ⏸
+            </div>
+            <h3 id="host-pause-dialog-title" className="text-xl sm:text-2xl font-black text-[#122017] mb-1 tracking-tight">
+              Partida pausada
+            </h3>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FBEBE8] border border-[#D05F36]/30 text-[#D05F36] text-[11px] font-black tracking-wider uppercase mb-2 shadow-xs">
+              Rodada pausada
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-[#D05F36] mb-2">
+              Você pausou a partida. O cronômetro está congelado{remainingMs !== null ? ` em ${Math.ceil((remainingMs || 0) / 1000)}s.` : '.'}
+            </p>
+            <p className="text-xs text-[#555E57] leading-relaxed mb-4">
+              A rodada está suspensa temporariamente. Clique no botão abaixo para retomar a partida do mesmo ponto.
+            </p>
+            {onResume ? (
+              <div className="flex flex-col gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={onResume}
+                  disabled={onResumeDisabled}
+                  className="w-full py-3 px-5 bg-[#123829] hover:bg-[#1B4D3E] disabled:bg-slate-400 text-white font-bold text-sm sm:text-base rounded-2xl shadow-lg transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
+                  aria-label="Retomar Rodada - Retomar Partida"
+                >
+                  <span>▶</span> Retomar Partida
+                </button>
+                <span className="text-[11px] font-semibold text-[#64748B]">
+                  Contagem regressiva de 3s antecede a retomada
+                </span>
+              </div>
+            ) : (
+              <span className="inline-block text-[11px] font-bold text-[#64748B] bg-[#FAF8F3] border border-[#E2DDD2] px-3 py-1 rounded-full">
+                Aguardando reconexão dos controles do apresentador
+              </span>
+            )}
+          </div>
         </div>
       )}
 

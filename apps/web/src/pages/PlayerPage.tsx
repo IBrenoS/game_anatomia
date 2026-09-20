@@ -67,14 +67,11 @@ export function PlayerPage() {
     }
   }, [pin, connectionState, playerId, connect, manager, navigate]);
 
-  const isGameplay = Boolean(
-    roomState &&
-      roomState !== 'LOBBY'
-  );
+  const isArenaActive = Boolean(roomState);
 
-  // Sync body and documentElement background color based on game state (dark for pre-game, ivory for gameplay)
+  // Sync body and documentElement background color based on game state (dark for pre-game connection, ivory for player arena)
   useEffect(() => {
-    if (isGameplay) {
+    if (isArenaActive) {
       document.body.style.backgroundColor = '#FAF8F3';
       document.body.style.color = '#122017';
       document.documentElement.style.backgroundColor = '#FAF8F3';
@@ -88,7 +85,7 @@ export function PlayerPage() {
       document.body.style.color = '';
       document.documentElement.style.backgroundColor = '';
     };
-  }, [isGameplay]);
+  }, [isArenaActive]);
 
   const isConnected = connectionState === 'connected' || manager.state === 'connected';
   if (!isConnected && (connectionState === 'disconnected' || connectionState === 'connecting')) {
@@ -156,24 +153,14 @@ export function PlayerPage() {
   return (
     <div
       className={`min-h-screen ${
-        isGameplay ? 'gameplay-canvas bg-[#FAF8F3] text-[#122017]' : 'dark-arena-bg text-[#FAF7F2]'
+        isArenaActive ? 'gameplay-canvas bg-[#FAF8F3] text-[#122017]' : 'dark-arena-bg text-[#FAF7F2]'
       } flex flex-col relative overflow-x-hidden`}
     >
       {/* P15: Reconnect Overlay (System layer over the battle) */}
-      <ReconnectOverlay isReconnecting={connectionState === 'reconnecting'} isGameplay={isGameplay} />
+      <ReconnectOverlay isReconnecting={connectionState === 'reconnecting'} isGameplay={isArenaActive} />
 
       {/* P16: Connection Restored Toast */}
       <ConnectionRestoredToast show={showRestoredToast} />
-
-      {/* Subtle Top Metadata Bar (PIN and Player Nickname) */}
-      {isGameplay && (
-        <header className="px-3 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/90 backdrop-blur-xs flex justify-between items-center text-xs border-b border-[#E2DDD2]/60 shrink-0 z-20 select-none">
-          <span className="font-mono font-bold text-[#64748B]">PIN: {pin}</span>
-          <span className="font-bold text-[#123829] bg-white border border-[#E2DDD2] px-3 py-0.5 rounded-full shadow-xs">
-            {nickname || 'Jogador'}
-          </span>
-        </header>
-      )}
 
       {/* Main Content Viewport */}
       <main className="flex-1 flex flex-col min-h-0 w-full">
