@@ -67,6 +67,7 @@ interface GameStoreState {
   
   // Podium
   podium: RankingEntry[];
+  podiumStartedAt: number | null;
   
   // Personal score tracking
   personalScore: PersonalScore;
@@ -146,6 +147,7 @@ const initialState = {
   previousRankings: [],
   isFinalRanking: false,
   podium: [],
+  podiumStartedAt: null,
   personalScore: {
     totalPoints: 0,
     correctCount: 0,
@@ -287,6 +289,7 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
       : (payload.currentQuestion !== undefined ? payload.currentQuestion : state.currentQuestion);
 
     const isCountdown = status === 'COUNTDOWN';
+    const isPodium = status === 'PODIUM';
     const authoritativePhaseStartedAt = payload.phaseStartedAt ?? payload.room?.phaseStartedAt;
     const authoritativePhaseDeadlineAt = payload.phaseDeadlineAt ?? payload.room?.phaseDeadlineAt;
     const countdownStartedAt = isCountdown
@@ -294,6 +297,9 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
       : null;
     const startedAt = authoritativePhaseStartedAt
       ?? (isCountdown ? countdownStartedAt : (payload.round?.startedAt ?? (status === 'QUESTION_ACTIVE' ? state.startedAt : null)));
+    const podiumStartedAt = isPodium
+      ? (authoritativePhaseStartedAt ?? state.podiumStartedAt ?? Date.now())
+      : (status === 'FINISHED' ? (state.podiumStartedAt ?? authoritativePhaseStartedAt ?? Date.now()) : null);
     const deadlineAt = authoritativePhaseDeadlineAt
       ?? (status === 'PAUSED'
         ? null
@@ -319,6 +325,7 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
       currentQuestion,
       countdownStartedAt,
       startedAt,
+      podiumStartedAt,
       deadlineAt,
       remainingMs: payload.remainingMs ?? (status === 'PAUSED' ? payload.round?.remainingMs ?? state.remainingMs : null),
       countdownKind: payload.countdownKind ?? payload.room?.countdownKind ?? null,
@@ -395,9 +402,13 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
 
   handleGameStateChanged: (payload) => set((state) => {
     const isCountdown = payload.state === 'COUNTDOWN';
+    const isPodium = payload.state === 'PODIUM';
     const now = Date.now();
     const phaseStartedAt = payload.phaseStartedAt ?? (isCountdown ? now : state.startedAt);
     const phaseDeadlineAt = payload.phaseDeadlineAt ?? (isCountdown ? now + 3000 : state.deadlineAt);
+    const podiumStartedAt = isPodium
+      ? (payload.phaseStartedAt ?? now)
+      : (payload.state === 'FINISHED' ? (state.podiumStartedAt ?? payload.phaseStartedAt ?? now) : null);
     return {
       roomState: payload.state,
       roomVersion: payload.roomVersion,
@@ -405,6 +416,7 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
       currentQuestionIndex: payload.currentQuestionIndex,
       countdownStartedAt: isCountdown ? phaseStartedAt : null,
       startedAt: phaseStartedAt,
+      podiumStartedAt,
       deadlineAt: payload.state === 'PAUSED' ? null : phaseDeadlineAt,
       remainingMs: payload.remainingMs ?? state.remainingMs,
       countdownKind: payload.countdownKind ?? null,
@@ -509,11 +521,12 @@ export const useGameStore = create<GameStoreState>((set, get, api) => {
     };
   }),
 
-  handleRoomFinished: (payload) => set({
+  handleRoomFinished: (payload) => set((state) => ({
     podium: payload.podium ?? payload.fullRanking?.slice(0, 3) ?? [],
     rankings: payload.fullRanking ?? [],
     roomState: payload.isFinal ? 'PODIUM' as GameState : 'FINISHED' as GameState,
-  }),
+    podiumStartedAt: state.podiumStartedAt ?? Date.now(),
+  })),
 
   selectOption: (optionId) => set({
     selectedOptionId: optionId,

@@ -262,9 +262,8 @@ export function HostPage() {
       case 'FINAL_RANKING':
         return <HostRanking rankings={rankings} isFinal={isFinalRanking} />;
       case 'PODIUM':
-        return <HostPodium podium={podium} />;
       case 'FINISHED':
-        return renderPresenterFinished();
+        return <HostPodium podium={podium} roomState={roomState} />;
       default:
         return <div className="flex-1 flex items-center justify-center text-[#555E57]">Aguardando estado do jogo...</div>;
     }

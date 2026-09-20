@@ -101,9 +101,8 @@ export function ScreenPage() {
       case 'FINAL_RANKING':
         return <ScreenRanking rankings={rankings} isFinal={true} />;
       case 'PODIUM':
-        return <ScreenPodium podium={podium} />;
       case 'FINISHED':
-        return <ScreenFinished />;
+        return <ScreenPodium podium={podium} roomState={roomState} />;
       default:
         return (
           <div className="flex-1 flex items-center justify-center text-center p-8 text-2xl font-bold text-[#555E57]">

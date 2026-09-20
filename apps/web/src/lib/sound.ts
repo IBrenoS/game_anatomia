@@ -232,6 +232,69 @@ class SoundEffectsManager {
   }
 
   /**
+   * Bronze medal short cue (~220ms warm brass chord).
+   */
+  public playBronzeCue(): void {
+    if (!this.isEnabled()) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const freqs = [349.23, 440.0]; // F4, A4
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = ctx.currentTime + idx * 0.08;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.16, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.22);
+      });
+    } catch {
+      // AudioContext error suppressed
+    }
+  }
+
+  /**
+   * Silver medal cue (~260ms rising tone with slight tension increase).
+   */
+  public playSilverCue(): void {
+    if (!this.isEnabled()) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const freqs = [392.0, 493.88, 587.33]; // G4, B4, D5
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = ctx.currentTime + idx * 0.08;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.18, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.26);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.26);
+      });
+    } catch {
+      // AudioContext error suppressed
+    }
+  }
+
+  /**
+   * Gold medal / 1st place resolution cue (start of fanfare).
+   */
+  public playGoldCue(): void {
+    this.playFanfare();
+  }
+
+  /**
    * Fanfare for podium champions ceremony.
    */
   public playFanfare(): void {
@@ -253,6 +316,42 @@ class SoundEffectsManager {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(f, start);
         gain.gain.setValueAtTime(0.22, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + d);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + d);
+      });
+    } catch {
+      // AudioContext error suppressed
+    }
+  }
+
+  /**
+   * Climax musical fanfare for Champion Moment (~900ms).
+   */
+  public playChampionClimax(): void {
+    if (!this.isEnabled()) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    try {
+      const notes = [
+        { f: 392.0, t: 0, d: 0.12 },
+        { f: 523.25, t: 0.12, d: 0.12 },
+        { f: 659.25, t: 0.24, d: 0.12 },
+        { f: 783.99, t: 0.36, d: 0.16 },
+        { f: 1046.5, t: 0.52, d: 0.5 },
+        { f: 659.25, t: 0.52, d: 0.5 },
+        { f: 783.99, t: 0.52, d: 0.5 },
+      ];
+      notes.forEach(({ f, t, d }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const start = ctx.currentTime + t;
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, start);
+        gain.gain.setValueAtTime(0.2, start);
         gain.gain.exponentialRampToValueAtTime(0.001, start + d);
         osc.connect(gain);
         gain.connect(ctx.destination);
