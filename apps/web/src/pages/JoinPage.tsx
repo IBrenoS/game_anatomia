@@ -177,7 +177,7 @@ export function JoinPage() {
                 <label htmlFor="nickname" className="block text-xs font-bold uppercase tracking-wider text-slate-300">
                   Seu apelido
                 </label>
-                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all">
+                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 focus-within:border-[#1FD4A7] transition-all duration-200">
                   <input
                     id="nickname"
                     type="text"
@@ -194,11 +194,13 @@ export function JoinPage() {
                     aria-describedby={error ? 'nickname-error' : undefined}
                   />
                 </div>
-                {error && (
-                  <p id="nickname-error" className="text-xs text-rose-400 font-medium mt-1" role="alert">
-                    {error}
-                  </p>
-                )}
+                <div className="min-h-[1.25rem]">
+                  {error && (
+                    <p id="nickname-error" className="text-xs text-rose-400 font-medium animate-[fadeInScale_0.15s_ease-out]" role="alert">
+                      {error}
+                    </p>
+                  )}
+                </div>
                 <p className="text-[11px] text-slate-400">
                   Seu nome aparecerá no telão e no ranking da partida.
                 </p>
@@ -206,14 +208,14 @@ export function JoinPage() {
 
               <button
                 type="submit"
-                aria-label={isJoining ? 'Entrando na arena' : 'Entrar para jogar — Entrar na arena'}
+                aria-label={isJoining ? 'Entrando na partida' : 'Entrar para jogar — Entrar na arena'}
                 disabled={isJoining || nickname.trim().length < 2}
-                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
               >
                 {isJoining ? (
                   <>
                     <div className="w-5 h-5 border-2 border-[#080C11] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Conectando" />
-                    <span>Entrando na arena...</span>
+                    <span>Entrando na partida...</span>
                   </>
                 ) : (
                   <>
@@ -229,7 +231,7 @@ export function JoinPage() {
             <button
               type="button"
               onClick={() => navigate('/?step=join')}
-              className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1FD4A7] rounded px-1"
             >
               <span>←</span>
               <span>Trocar PIN</span>

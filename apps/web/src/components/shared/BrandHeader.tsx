@@ -10,7 +10,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({
   className = '',
 }) => {
   return (
-    <header className={`w-full flex justify-between items-center py-4 select-none ${className}`}>
+    <header className={`w-full flex justify-between items-center py-2.5 sm:py-4 select-none ${className}`}>
       <div className="flex flex-col">
         <span className="text-xs sm:text-sm font-black tracking-widest text-white uppercase">
           BATALHA ANATÔMICA

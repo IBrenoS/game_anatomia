@@ -101,8 +101,36 @@ body {
   }
 }
 
+@keyframes ambientFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes slideFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fade-in-scale {
   animation: fadeInScale 0.25s ease-out;
+}
+
+.animate-ambient-float {
+  animation: ambientFloat 6s ease-in-out infinite;
+}
+
+.animate-slide-fade-in {
+  animation: slideFadeIn 0.2s ease-out;
 }
 
 .animate-ring-orbit {

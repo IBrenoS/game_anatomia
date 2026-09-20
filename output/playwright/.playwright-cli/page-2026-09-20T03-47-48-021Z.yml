@@ -1,0 +1,9 @@
+- generic [ref=e4]:
+  - main [ref=e5]:
+    - img "Batalha Anatômica — Bovino versus Equino" [ref=e8]
+    - generic [ref=e10]:
+      - generic [ref=e11]: ANATOMIA VETERINÁRIA
+      - heading "Conhecimento em modo batalha." [level=1] [ref=e12]: Conhecimentoem modobatalha.
+      - paragraph [ref=e13]: Bovino × Equino em uma disputa rápida para jogar em grupo.
+      - button "Iniciar" [ref=e15] [cursor=pointer]
+  - contentinfo [ref=e16]: Batalha Anatômica • Medicina Veterinária

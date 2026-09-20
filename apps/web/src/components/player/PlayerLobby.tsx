@@ -25,7 +25,7 @@ export const PlayerLobby: React.FC<PlayerLobbyProps> = ({ nickname }) => {
 
         {/* Player count pill */}
         <div className="text-xs font-semibold text-slate-300 bg-white/5 px-3 py-1 rounded-full border border-white/10 mb-8">
-          <span>{playerCount} participante{playerCount === 1 ? '' : 's'} na arena</span>
+          <span>{playerCount} jogador{playerCount === 1 ? '' : 'es'} na sala</span>
         </div>
         
         {/* Subtle teal spinner */}

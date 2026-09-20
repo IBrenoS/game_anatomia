@@ -114,24 +114,24 @@ export const HomePage: React.FC = () => {
             TELA 1 — ABERTURA
            ======================================================== */}
         {step === 'welcome' && (
-          <main className="w-full my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          <main className="w-full my-auto py-3 sm:py-6 lg:py-10 animate-[fadeInScale_0.3s_ease-out]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-center">
               {/* Left Column: Hero Text & Main CTA */}
-              <div className="lg:col-span-7 flex flex-col items-start space-y-6 sm:space-y-8">
+              <div className="lg:col-span-7 flex flex-col items-start space-y-4 sm:space-y-6">
                 {/* Veterinary label */}
                 <span className="text-xs font-bold uppercase tracking-wider text-[#1FD4A7]">
                   ANATOMIA VETERINÁRIA
                 </span>
 
                 {/* Main Display Title */}
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.08]">
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.08]">
                   Conhecimento<br />
                   em modo<br />
                   <span className="text-white">batalha.</span>
                 </h1>
 
                 {/* Subtitle */}
-                <p className="text-base sm:text-lg text-slate-300 max-w-md font-normal leading-relaxed">
+                <p className="text-sm sm:text-base text-slate-300 max-w-md font-normal leading-relaxed">
                   Bovino × Equino em uma disputa rápida para jogar em grupo.
                 </p>
 
@@ -141,11 +141,11 @@ export const HomePage: React.FC = () => {
                 </div>
 
                 {/* Dominant Action CTA */}
-                <div className="w-full sm:w-auto flex flex-col items-start space-y-3 pt-2">
+                <div className="w-full sm:w-auto flex flex-col items-start space-y-3 pt-1 sm:pt-2">
                   <button
                     type="button"
                     onClick={() => navigateToStep('choice')}
-                    className="w-full sm:w-auto min-w-[200px] py-4 px-10 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-black text-lg tracking-wide shadow-[0_0_24px_rgba(31,212,167,0.25)] hover:shadow-[0_0_32px_rgba(31,212,167,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    className="w-full sm:w-auto min-w-[200px] py-3.5 sm:py-4 px-8 sm:px-10 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-black text-base sm:text-lg tracking-wide shadow-[0_0_24px_rgba(31,212,167,0.25)] hover:shadow-[0_0_32px_rgba(31,212,167,0.4)] transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
                   >
                     Iniciar
                   </button>
@@ -195,7 +195,7 @@ export const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigateToStep('join')}
-                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-bold text-base tracking-wide shadow-[0_4px_16px_rgba(31,212,167,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-bold text-base tracking-wide shadow-[0_4px_16px_rgba(31,212,167,0.2)] transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
                   >
                     <span>Entrar para jogar</span>
                     <span>→</span>
@@ -224,7 +224,7 @@ export const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/host')}
-                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-base tracking-wide border border-white/15 hover:border-white/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-base tracking-wide border border-white/15 hover:border-white/30 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
                   >
                     <span>Criar partida</span>
                     <span>→</span>
@@ -238,7 +238,7 @@ export const HomePage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => navigateToStep('welcome')}
-                className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1FD4A7] rounded px-1"
               >
                 <span>←</span>
                 <span>Voltar</span>
@@ -265,7 +265,7 @@ export const HomePage: React.FC = () => {
             <form onSubmit={handleJoinByPin} className="space-y-4">
               <div>
                 {/* Prominent White/Ivory Rounded Box */}
-                <div className="w-full bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 shadow-2xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all flex items-center justify-center">
+                <div className="w-full bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 shadow-2xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 focus-within:border-[#1FD4A7] transition-all duration-200 flex items-center justify-center">
                   <input
                     id="pin-input"
                     type="text"
@@ -283,18 +283,20 @@ export const HomePage: React.FC = () => {
                   />
                 </div>
 
-                {pinError && (
-                  <p className="text-xs text-rose-400 font-medium mt-2 text-left" role="alert">
-                    {pinError}
-                  </p>
-                )}
+                <div className="min-h-[1.5rem] mt-1.5 flex items-center">
+                  {pinError && (
+                    <p className="text-xs text-rose-400 font-medium text-left animate-[fadeInScale_0.15s_ease-out]" role="alert">
+                      {pinError}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Dominant CTA Button */}
               <button
                 type="submit"
                 disabled={!isPinReady}
-                className="w-full py-4 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full py-4 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
               >
                 <span>Entrar</span>
                 <span>→</span>
@@ -326,7 +328,7 @@ export const HomePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsCameraOpen(true)}
-                    className="py-2.5 px-4 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-xs tracking-wide border border-white/15 transition-all active:scale-95 cursor-pointer shrink-0"
+                    className="py-2.5 px-4 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-xs tracking-wide border border-white/15 hover:border-white/30 transition-all active:scale-95 cursor-pointer shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7]"
                   >
                     Abrir câmera
                   </button>

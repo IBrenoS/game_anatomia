@@ -106,7 +106,7 @@ export function HostPage() {
   // During LOBBY, render the dedicated redesigned Tela 5 layout without technical operational headers
   if (roomState === 'LOBBY') {
     return (
-      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col p-4 sm:p-6 md:p-10 relative overflow-hidden">
+      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col p-3 sm:p-6 md:p-10 relative overflow-x-hidden">
         <div 
           className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#123829]/20 blur-3xl pointer-events-none" 
           aria-hidden="true" 

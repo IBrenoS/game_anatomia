@@ -119,16 +119,24 @@ export const QrScannerView: React.FC<QrScannerViewProps> = ({ onScanSuccess, onC
   return (
     <div className="w-full bg-[#0E1522] border border-white/10 rounded-2xl p-4 flex flex-col items-center relative overflow-hidden animate-[fadeInScale_0.2s_ease-out]">
       <div className="w-full flex justify-between items-center mb-3">
-        <span className="text-xs font-bold uppercase tracking-wider text-[#1FD4A7]">
-          Escanear QR Code
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#1FD4A7]">
+            Escanear QR Code
+          </span>
+          {!isLoading && !errorMessage && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#123829] border border-[#1FD4A7]/30 text-[#1FD4A7] text-[10px] font-semibold animate-[fadeInScale_0.2s_ease-out]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#1FD4A7] animate-pulse" aria-hidden="true" />
+              <span>Câmera ativa</span>
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => {
             stopCamera();
             onClose();
           }}
-          className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+          className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1FD4A7]"
         >
           Fechar câmera
         </button>

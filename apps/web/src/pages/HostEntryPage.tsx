@@ -117,24 +117,39 @@ export const HostEntryPage: React.FC = () => {
                   setMode('player');
                   setErrorMessage(null);
                 }}
-                className={`w-full p-5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] ${
+                className={`w-full p-5 rounded-2xl border text-left transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex flex-col justify-between min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11] ${
                   mode === 'player'
                     ? 'border-[#1FD4A7] bg-[#123829]/40 ring-1 ring-[#1FD4A7]/50 shadow-[0_0_20px_rgba(31,212,167,0.15)]'
                     : 'border-white/10 bg-[#0E1522] hover:bg-[#151F2E] hover:border-white/20'
                 }`}
               >
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-white">
-                    Também vou jogar
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Você cria e compete.
-                  </p>
+                <div className="flex items-start justify-between w-full">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      Também vou jogar
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                      Você cria e compete.
+                    </p>
+                  </div>
+                  <span className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ml-3 transition-colors ${
+                    mode === 'player' ? 'border-[#1FD4A7] bg-[#1FD4A7] text-[#080C11]' : 'border-white/30 bg-white/5'
+                  }`}>
+                    {mode === 'player' && (
+                      <svg className="w-3 h-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
                 </div>
 
-                {mode === 'player' && (
-                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded">
-                    SELECIONADO
+                {mode === 'player' ? (
+                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded flex items-center gap-1">
+                    <span>✓</span> SELECIONADO
+                  </span>
+                ) : (
+                  <span className="self-start mt-3 text-[10px] font-medium text-slate-400">
+                    Selecionar
                   </span>
                 )}
               </button>
@@ -147,24 +162,39 @@ export const HostEntryPage: React.FC = () => {
                   setMode('presenter');
                   setErrorMessage(null);
                 }}
-                className={`w-full p-5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] ${
+                className={`w-full p-5 rounded-2xl border text-left transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex flex-col justify-between min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11] ${
                   mode === 'presenter'
                     ? 'border-[#1FD4A7] bg-[#123829]/40 ring-1 ring-[#1FD4A7]/50 shadow-[0_0_20px_rgba(31,212,167,0.15)]'
                     : 'border-white/10 bg-[#0E1522] hover:bg-[#151F2E] hover:border-white/20'
                 }`}
               >
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-white">
-                    Só vou apresentar
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                    Você controla sem competir.
-                  </p>
+                <div className="flex items-start justify-between w-full">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      Só vou apresentar
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                      Você controla sem competir.
+                    </p>
+                  </div>
+                  <span className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ml-3 transition-colors ${
+                    mode === 'presenter' ? 'border-[#1FD4A7] bg-[#1FD4A7] text-[#080C11]' : 'border-white/30 bg-white/5'
+                  }`}>
+                    {mode === 'presenter' && (
+                      <svg className="w-3 h-3 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
                 </div>
 
-                {mode === 'presenter' && (
-                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded">
-                    SELECIONADO
+                {mode === 'presenter' ? (
+                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded flex items-center gap-1">
+                    <span>✓</span> SELECIONADO
+                  </span>
+                ) : (
+                  <span className="self-start mt-3 text-[10px] font-medium text-slate-400">
+                    Selecionar
                   </span>
                 )}
               </button>
@@ -180,7 +210,7 @@ export const HostEntryPage: React.FC = () => {
                   Seu nome
                 </label>
 
-                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all">
+                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 focus-within:border-[#1FD4A7] transition-all duration-200">
                   <input
                     id="host-nickname"
                     type="text"
@@ -208,9 +238,9 @@ export const HostEntryPage: React.FC = () => {
             <div className="pt-4">
               <button
                 type="submit"
-                aria-label={mode === 'player' ? 'Criar partida — Criar minha partida' : 'Criar partida'}
+                aria-label="Criar partida"
                 disabled={isSubmitting || !mode || (mode === 'player' && nickname.trim().length < 2)}
-                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1FD4A7] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080C11]"
               >
                 {isSubmitting ? (
                   <>
@@ -221,7 +251,7 @@ export const HostEntryPage: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span>{mode === 'player' ? 'Criar minha partida' : 'Criar partida'}</span>
+                    <span>Criar partida</span>
                     <span>→</span>
                   </>
                 )}
@@ -234,7 +264,7 @@ export const HostEntryPage: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate('/?step=choice')}
-              className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#1FD4A7] rounded px-1"
             >
               <span>←</span>
               <span>Voltar</span>

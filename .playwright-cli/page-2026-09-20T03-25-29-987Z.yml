@@ -1,0 +1,12 @@
+- generic [ref=e4]:
+  - main [ref=e5]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: BOVINO
+      - generic "versus" [ref=e11]: ×
+      - generic [ref=e12]: EQUINO
+    - generic [ref=e14]:
+      - generic [ref=e15]: ANATOMIA VETERINÁRIA
+      - heading "Conhecimento em modo batalha." [level=1] [ref=e16]: Conhecimentoem modobatalha.
+      - paragraph [ref=e17]: Bovino × Equino em uma disputa rápida para jogar em grupo.
+      - button "Iniciar" [ref=e19] [cursor=pointer]
+  - contentinfo [ref=e20]: Batalha Anatômica • Medicina Veterinária
