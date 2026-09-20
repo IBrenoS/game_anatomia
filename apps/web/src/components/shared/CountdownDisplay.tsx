@@ -47,25 +47,56 @@ export default function CountdownDisplay({ mode = 'player', onComplete }: Countd
 
   if (mode === 'screen') {
     const isResume = countdownKind === 'RESUME';
+    const isInitial = countdownKind === 'INITIAL';
+
+    const badgeText = isResume
+      ? 'Retomando Partida!'
+      : isInitial
+      ? 'A Batalha vai começar!'
+      : 'Preparação para a Próxima Questão';
+
+    const guidanceText = isResume
+      ? 'A rodada continuará de onde parou!'
+      : isInitial
+      ? 'Prepare-se para a 1ª questão da arena!'
+      : 'A próxima questão vai começar em instantes!';
+
     return (
-      <div className="flex-1 flex flex-col items-center justify-center select-none text-center p-8">
-        <span className="text-2xl md:text-3xl font-bold uppercase tracking-widest text-blue-300 bg-blue-950/60 px-8 py-2 rounded-full border border-blue-400/30 mb-8 animate-pulse">
-          {isResume ? 'Retomando Partida!' : 'Prepare-se!'}
+      <div className="flex-1 flex flex-col items-center justify-center select-none text-center p-6 md:p-10 w-full animate-fade-in-scale">
+        <div className="flex flex-col items-center mb-6">
+          <span className="text-xs md:text-sm font-black tracking-widest text-[#123829] uppercase mb-1">
+            BATALHA ANATÔMICA
+          </span>
+          <span className="text-[10px] md:text-xs font-bold tracking-wider text-[#648B68] uppercase">
+            BOVINO <span className="text-[#D05F36]">×</span> EQUINO
+          </span>
+        </div>
+
+        <span
+          className={`text-xl md:text-3xl font-black uppercase tracking-widest px-8 md:px-10 py-2.5 rounded-full border-2 shadow-xs mb-6 ${
+            isResume
+              ? 'bg-[#FEF9EE] border-[#F59E0B]/50 text-[#B45309]'
+              : isInitial
+              ? 'bg-[#EAF5EC] border-[#2D8058]/30 text-[#2D8058]'
+              : 'bg-white border-[#123829]/20 text-[#123829]'
+          }`}
+        >
+          {badgeText}
         </span>
 
-        <div className="relative flex items-center justify-center my-6">
-          <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-8 border-yellow-400/40 bg-black/40 flex items-center justify-center shadow-[0_0_60px_rgba(250,204,21,0.5)]">
+        <div className="relative flex items-center justify-center my-4">
+          <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-8 border-[#123829] bg-white flex items-center justify-center shadow-2xl">
             <span
               key={count}
-              className="text-9xl md:text-[14rem] font-black text-yellow-300 font-mono drop-shadow-[0_0_35px_rgba(250,204,21,0.9)] animate-[scaleIn_0.35s_ease-out] motion-reduce:animate-none"
+              className="text-9xl md:text-[14rem] font-black text-[#123829] font-mono animate-number-pulse"
             >
               {count}
             </span>
           </div>
         </div>
 
-        <p className="text-3xl font-medium text-blue-200 mt-8">
-          {isResume ? 'A rodada continuará de onde parou!' : 'A próxima questão vai começar!'}
+        <p className="text-2xl md:text-3xl font-bold text-[#555E57] mt-8 max-w-xl">
+          {guidanceText}
         </p>
       </div>
     );

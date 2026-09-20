@@ -259,12 +259,27 @@ body {
   }
 }
 
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-rank-up {
   animation: rankUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-rank-down {
   animation: rankDown 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-in {
+  animation: slideIn 0.35s ease-out both;
 }
 
 .dark-arena-bg {

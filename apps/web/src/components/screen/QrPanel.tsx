@@ -12,30 +12,34 @@ export default function QrPanel({ pin }: QrPanelProps) {
   useEffect(() => {
     if (joinUrl) {
       QRCode.toDataURL(joinUrl, {
-        width: 320,
+        width: 360,
         margin: 2,
         color: {
-          dark: '#0f172a',
-          light: '#ffffff'
-        }
-      }).then(setQrDataUrl).catch(console.error);
+          dark: '#080C11',
+          light: '#FAF7F2',
+        },
+      })
+        .then(setQrDataUrl)
+        .catch(console.error);
     }
   }, [joinUrl]);
 
   return (
-    <div className="bg-white p-6 rounded-3xl shadow-2xl flex flex-col items-center border border-white/20">
+    <div className="bg-[#FAF7F2] p-6 sm:p-8 rounded-3xl shadow-2xl flex flex-col items-center border border-white/20">
       {qrDataUrl ? (
-        <img 
-          src={qrDataUrl} 
-          alt={`QR Code para entrar na sala ${pin}`} 
-          className="w-56 h-56 rounded-xl mb-3 shadow-inner" 
+        <img
+          src={qrDataUrl}
+          alt={`QR Code para entrar na sala ${pin}`}
+          className="w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 object-contain rounded-2xl mb-4 shadow-sm"
         />
       ) : (
-        <div className="w-56 h-56 bg-slate-100 flex items-center justify-center rounded-xl mb-3">
-          <span className="text-sm text-slate-500 font-semibold">Gerando QR Code...</span>
+        <div className="w-60 h-60 sm:w-72 sm:h-72 lg:w-80 lg:h-80 bg-slate-200 flex items-center justify-center rounded-2xl mb-4">
+          <span className="text-base text-slate-600 font-semibold">Gerando QR Code...</span>
         </div>
       )}
-      <p className="text-slate-900 font-black text-base uppercase tracking-wider">Aponte a câmera para entrar</p>
+      <p className="text-[#080C11] font-black text-base sm:text-lg lg:text-xl uppercase tracking-wider text-center">
+        Aponte a câmera para entrar
+      </p>
     </div>
   );
 }
