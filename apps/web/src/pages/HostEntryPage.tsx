@@ -84,7 +84,7 @@ export const HostEntryPage: React.FC = () => {
 
       <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col justify-between z-10">
         {/* Brand Header */}
-        <BrandHeader />
+        <BrandHeader showArenaStatus={false} />
 
         {/* Main Creation Flow (Tela 4) */}
         <main className="w-full max-w-2xl mx-auto my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
@@ -242,10 +242,6 @@ export const HostEntryPage: React.FC = () => {
           </div>
         </main>
 
-        {/* Footer info */}
-        <footer className="w-full py-4 text-center text-xs text-slate-500">
-          <span>Batalha Anatômica • Painel do Organizador</span>
-        </footer>
       </div>
     </div>
   );

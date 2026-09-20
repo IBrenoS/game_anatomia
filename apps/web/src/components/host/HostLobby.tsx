@@ -90,17 +90,12 @@ export const HostLobby: React.FC<HostLobbyProps> = ({ players, presences, pin })
   return (
     <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col justify-between select-none animate-[fadeInScale_0.3s_ease-out]">
       {/* Brand Header */}
-      <BrandHeader />
+      <BrandHeader showArenaStatus={false} />
 
       {/* Main Lobby View (Tela 5) */}
       <main className="w-full my-auto py-6 sm:py-8 space-y-8">
         {/* Title Area */}
         <div className="space-y-2 text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#123829]/60 border border-[#1FD4A7]/30 text-[#1FD4A7] text-xs font-bold uppercase tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#1FD4A7] animate-pulse" aria-hidden="true" />
-            <span>SALA CRIADA</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
             Sala criada
           </h1>
