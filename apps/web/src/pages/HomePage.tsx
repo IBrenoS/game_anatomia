@@ -265,7 +265,7 @@ export const HomePage: React.FC = () => {
             </div>
 
             {/* PIN Entry Form (Primary Action) */}
-            <form onSubmit={handleJoinByPin} className="space-y-4">
+            <form onSubmit={handleJoinByPin} noValidate className="space-y-4">
               <div>
                 {/* Prominent White/Ivory Rounded Box */}
                 <div className="w-full bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 shadow-2xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 focus-within:border-[#1FD4A7] transition-all duration-200 flex items-center justify-center">
@@ -273,7 +273,6 @@ export const HomePage: React.FC = () => {
                     id="pin-input"
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
                     autoComplete="one-time-code"
                     placeholder="000 000"
                     value={pinValue}

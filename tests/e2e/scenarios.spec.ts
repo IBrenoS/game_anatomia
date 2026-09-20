@@ -21,6 +21,16 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await expect(page.getByRole('button', { name: /digitar outro pin/i })).toBeVisible();
   });
 
+  test('Scenario 1b: Digitação de PIN na home formata com espaço e navega com sucesso para a sala', async ({ page }) => {
+    await page.goto('/?step=join');
+    const pinInput = page.getByLabel(/pin da sala/i);
+    await expect(pinInput).toBeVisible();
+    await pinInput.fill('346779');
+    await expect(pinInput).toHaveValue('346 779');
+    await page.getByRole('button', { name: /entrar/i }).click();
+    await expect(page).toHaveURL(/\/join\/346779/);
+  });
+
   test('Scenario 2: Entrada bloqueada impede novos participantes até ser liberada', async ({ browser }) => {
     // 1. Host creates room
     const hostContext = await browser.newContext();
