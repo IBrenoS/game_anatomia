@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { PublicQuestion } from '@batalha/protocol';
+import { TOTAL_QUESTIONS, type PublicQuestion } from '@batalha/protocol';
 import { useGameStore } from '../../stores/gameStore.js';
 
 interface HostQuestionProps {
@@ -38,69 +38,71 @@ export default function HostQuestion({ question, currentQuestionIndex, deadlineA
     return () => clearInterval(interval);
   }, [deadlineAt, isPaused, remainingMs]);
 
-  if (!question) return <div className="text-white text-center py-12">Carregando questão...</div>;
+  if (!question) return <div className="text-[#555E57] text-center py-12">Carregando questão...</div>;
 
   return (
-    <div className="flex flex-col h-full text-white max-w-5xl mx-auto w-full">
-      <div className="flex justify-between items-center mb-6">
-        {currentQuestionIndex === 9 ? (
-          <span className="text-lg font-black text-amber-950 bg-gradient-to-r from-yellow-400 to-amber-500 px-4 py-1.5 rounded-full border border-yellow-300 shadow-md animate-pulse uppercase tracking-wider">
-            🔥 DESAFIO FINAL · Questão 10 de 10
+    <div className="flex flex-col h-full text-[#122017] max-w-5xl mx-auto w-full p-4 sm:p-6 select-none">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+        {currentQuestionIndex === TOTAL_QUESTIONS - 1 ? (
+          <span className="text-xs sm:text-sm font-black text-[#B45309] bg-[#FEF9EE] px-3.5 py-1 rounded-full border border-[#F59E0B]/50 shadow-xs uppercase tracking-wider">
+            {`🔥 DESAFIO FINAL · Questão ${TOTAL_QUESTIONS} de ${TOTAL_QUESTIONS}`}
           </span>
         ) : (
-          <span className="text-lg font-bold bg-blue-900/60 px-4 py-1.5 rounded-full border border-blue-400/30 text-blue-200">
-            Questão {currentQuestionIndex + 1} de 10
+          <span className="text-xs sm:text-sm font-bold bg-white px-3.5 py-1 rounded-full border border-[#E2DDD2] text-[#122017] shadow-xs">
+            Questão {currentQuestionIndex + 1} de {TOTAL_QUESTIONS}
           </span>
         )}
-        <div className="flex items-center gap-4">
-          <div className="bg-black/40 px-4 py-2 rounded-2xl border border-white/10 text-sm font-bold text-blue-200 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>{answeredCount} / {activeEligiblePlayers} jogadores ativos responderam</span>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="bg-white px-3.5 py-1 rounded-full border border-[#E2DDD2] text-xs font-bold text-[#555E57] flex items-center gap-2 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-[#2D8058] animate-pulse" />
+            <span>{answeredCount} / {activeEligiblePlayers} responderam</span>
           </div>
-          <div className="text-4xl font-mono font-black bg-black/40 px-6 py-2 rounded-2xl border border-white/10 text-yellow-300">
+          <div className="text-2xl sm:text-3xl font-mono font-black bg-white px-4 py-1 rounded-2xl border border-[#E2DDD2] text-[#123829] shadow-xs">
             {isPaused ? `⏸ ${timeLeft}s` : `${timeLeft}s`}
           </div>
         </div>
       </div>
 
       {isPaused && (
-        <div role="status" className="mb-5 rounded-xl border border-amber-400/40 bg-amber-950/70 px-4 py-3 text-center font-bold text-amber-100">
+        <div role="status" className="mb-4 rounded-xl border border-[#D05F36]/30 bg-[#FBEBE8] px-4 py-2.5 text-center font-bold text-[#D05F36] text-xs sm:text-sm shadow-xs">
           Rodada pausada — cronômetro congelado
         </div>
       )}
 
-      <h2 className="text-3xl md:text-4xl font-black text-center mb-6 leading-tight">
+      <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-center my-3 sm:my-4 leading-snug">
         {question.prompt}
       </h2>
 
       {question.media && (
-        <div className="flex justify-center mb-6">
-          <img 
-            src={question.media.src} 
-            alt={question.media.alt || 'Ilustração anatômica'} 
-            width={question.media.width || 800}
-            height={question.media.height || 600}
-            className="max-h-64 object-contain rounded-xl shadow-2xl bg-white/5 border border-white/10"
-          />
+        <div className="flex justify-center my-2 sm:my-4">
+          <div className="bg-[#EBF0E8] border border-[#D5DDD0] rounded-2xl p-2 shadow-xs">
+            <img 
+              src={question.media.src} 
+              alt={question.media.alt || 'Ilustração anatômica'} 
+              width={question.media.width || 800}
+              height={question.media.height || 600}
+              className="max-h-48 sm:max-h-64 object-contain rounded-xl bg-white/70"
+            />
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-auto">
         {question.options.map((option, idx) => {
           const dist = distribution?.find(d => d.optionId === option.id);
           const count = dist ? dist.count : 0;
           return (
             <div 
               key={option.id}
-              className="bg-white/10 hover:bg-white/15 p-5 rounded-2xl text-lg font-bold border border-white/15 flex items-center justify-between gap-4 shadow-md transition-all"
+              className="bg-white hover:bg-[#F7F5EE] p-4 sm:p-5 rounded-2xl text-base sm:text-lg font-bold border border-[#E2DDD2] flex items-center justify-between gap-4 shadow-xs transition-all"
             >
-              <div className="flex items-center gap-4 truncate">
-                <span className="w-9 h-9 rounded-xl bg-blue-600/80 text-white flex items-center justify-center font-black shrink-0 shadow-sm">
+              <div className="flex items-center gap-3 truncate">
+                <span className="w-8 h-8 rounded-xl bg-[#123829] text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
                   {OPTION_LETTERS[idx] || (idx + 1)}
                 </span>
                 <span className="truncate">{option.label}</span>
               </div>
-              <span className="text-xs font-mono font-semibold bg-white/10 px-3 py-1.5 rounded-xl text-blue-200 border border-white/10 shrink-0">
+              <span className="text-xs font-mono font-semibold bg-[#FAF8F3] px-3 py-1 rounded-xl text-[#555E57] border border-[#E2DDD2] shrink-0">
                 {count} voto{count === 1 ? '' : 's'}
               </span>
             </div>

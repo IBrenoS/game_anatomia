@@ -1,20 +1,11 @@
-import type { Question, QuestionType } from '@batalha/protocol';
+import { TOTAL_QUESTIONS as GAME_TOTAL_QUESTIONS, type Question } from '@batalha/protocol';
 
 export type ValidationError = {
   questionId?: string;
   error: string;
 };
 
-export const TOTAL_QUESTIONS = 10;
-
-export const REQUIRED_MECHANICS: readonly QuestionType[] = [
-  'identify',
-  'region',
-  'species',
-  'function',
-  'boolean',
-  'final',
-] as const;
+export const TOTAL_QUESTIONS = GAME_TOTAL_QUESTIONS;
 
 export function validateQuestions(questions: Question[]): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -22,14 +13,6 @@ export function validateQuestions(questions: Question[]): ValidationError[] {
 
   if (questions.length !== TOTAL_QUESTIONS) {
     errors.push({ error: `Expected exactly ${TOTAL_QUESTIONS} questions, got ${questions.length}` });
-  }
-
-  // Verify that all 6 mechanics are represented in the question set
-  const presentMechanics = new Set<QuestionType>(questions.map(q => q.type));
-  for (const mechanic of REQUIRED_MECHANICS) {
-    if (!presentMechanics.has(mechanic)) {
-      errors.push({ error: `Missing required question mechanic/type: '${mechanic}'` });
-    }
   }
 
   for (let i = 0; i < questions.length; i++) {

@@ -17,7 +17,6 @@ import PlayerRanking from '../components/player/PlayerRanking.js';
 import PlayerPodium from '../components/player/PlayerPodium.js';
 import PlayerFinished from '../components/player/PlayerFinished.js';
 import ReconnectOverlay from '../components/player/ReconnectOverlay.js';
-import CountdownDisplay from '../components/shared/CountdownDisplay.js';
 
 export function HostPage() {
   const { pin: routePin } = useParams<{ pin: string }>();
@@ -59,6 +58,7 @@ export function HostPage() {
   const isFinalRanking = useGameStore((s) => s.isFinalRanking);
   const podium = useGameStore((s) => s.podium);
   const connectedPlayers = useGameStore((s) => s.connectedPlayers);
+  const previousRankings = useGameStore((s) => s.previousRankings);
   const personalRanking = rankings.find(ranking => ranking.playerId === playerId);
 
   useEffect(() => {
@@ -88,6 +88,29 @@ export function HostPage() {
     }
   }, [hostSocket.manager, restorationError]);
 
+  const isGameplay = Boolean(
+    roomState &&
+      roomState !== 'LOBBY'
+  );
+
+  // Sync body and documentElement background color based on game state (dark for pre-game lobby, ivory for gameplay)
+  useEffect(() => {
+    if (isGameplay) {
+      document.body.style.backgroundColor = '#FAF8F3';
+      document.body.style.color = '#122017';
+      document.documentElement.style.backgroundColor = '#FAF8F3';
+    } else {
+      document.body.style.backgroundColor = '#080C11';
+      document.body.style.color = '#FAF7F2';
+      document.documentElement.style.backgroundColor = '#080C11';
+    }
+    return () => {
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
+      document.documentElement.style.backgroundColor = '';
+    };
+  }, [isGameplay]);
+
   const primaryConnectionState = competitiveView
     ? playerSocket.connectionState
     : hostSocket.connectionState;
@@ -115,7 +138,7 @@ export function HostPage() {
           className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#D05F36]/10 blur-3xl pointer-events-none" 
           aria-hidden="true" 
         />
-        <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} />
+        <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} isGameplay={false} />
         {restorationError && (
           <div role="alert" className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/80 p-3 text-center font-bold text-amber-100 text-xs sm:text-sm">
             {restorationError}
@@ -127,13 +150,13 @@ export function HostPage() {
   }
 
   const renderPresenterFinished = () => (
-    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-6">
-      <span className="text-6xl">🏁</span>
-      <h2 className="text-4xl font-black text-white">Partida Encerrada</h2>
-      <p className="text-slate-300 text-lg max-w-md">
+    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8 space-y-4 sm:space-y-6 select-none">
+      <span className="text-5xl sm:text-6xl">🏁</span>
+      <h2 className="text-3xl sm:text-4xl font-black text-[#122017]">Partida Encerrada</h2>
+      <p className="text-[#555E57] text-base sm:text-lg max-w-md">
         A batalha foi concluída com sucesso. Você pode iniciar uma nova partida ou voltar ao início.
       </p>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap justify-center gap-3">
         <button
           type="button"
           onClick={() => {
@@ -141,7 +164,7 @@ export function HostPage() {
             useGameStore.getState().resetStore();
             navigate('/host');
           }}
-          className="px-6 py-3 bg-[#1FD4A7] hover:bg-[#19C298] font-bold text-[#080C11] rounded-xl shadow transition-all cursor-pointer"
+          className="px-6 py-3 bg-[#123829] hover:bg-[#1B4D3E] font-bold text-white rounded-xl shadow-xs transition-all cursor-pointer"
         >
           Nova Partida
         </button>
@@ -152,7 +175,7 @@ export function HostPage() {
             useGameStore.getState().resetStore();
             navigate('/');
           }}
-          className="px-6 py-3 bg-white/10 hover:bg-white/20 font-bold text-white rounded-xl transition-all cursor-pointer"
+          className="px-6 py-3 bg-white hover:bg-[#F7F5EE] border border-[#E2DDD2] font-bold text-[#122017] rounded-xl shadow-xs transition-all cursor-pointer"
         >
           Voltar ao Início
         </button>
@@ -184,19 +207,25 @@ export function HostPage() {
           return <PlayerReveal result={personalResult} correctOptionId={correctOptionId} question={currentQuestion} />;
         case 'ROUND_RANKING':
         case 'FINAL_RANKING':
-          return <PlayerRanking ranking={personalRanking} isFinal={isFinalRanking} />;
+          return (
+            <PlayerRanking
+              ranking={personalRanking}
+              isFinal={isFinalRanking}
+              previousRankings={previousRankings}
+            />
+          );
         case 'PODIUM':
           return <PlayerPodium podium={podium} playerId={playerId} />;
         case 'FINISHED':
           return <PlayerFinished ranking={personalRanking} />;
         default:
-          return <div className="flex-1 flex items-center justify-center text-white">Aguarde...</div>;
+          return <div className="flex-1 flex items-center justify-center text-[#555E57]">Aguarde...</div>;
       }
     }
 
     switch (roomState) {
       case 'COUNTDOWN':
-        return <CountdownDisplay mode="host" />;
+        return <PlayerCountdown />;
       case 'PAUSED':
       case 'QUESTION_ACTIVE':
         return (
@@ -224,47 +253,52 @@ export function HostPage() {
       case 'FINISHED':
         return renderPresenterFinished();
       default:
-        return <div className="flex-1 flex items-center justify-center text-white">Aguardando estado do jogo...</div>;
+        return <div className="flex-1 flex items-center justify-center text-[#555E57]">Aguardando estado do jogo...</div>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col">
-      <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} />
-      <header className="p-4 bg-[#0E1522] flex justify-between items-center text-white border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base sm:text-lg font-bold">
-            {competitiveView ? `Host + Player — ${nickname || 'Jogador'}` : 'Apresentador'} — Sala PIN: {pin}
-          </h1>
+    <div className="min-h-screen gameplay-canvas bg-[#FAF8F3] text-[#122017] flex flex-col relative overflow-x-hidden">
+      <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} isGameplay={isGameplay} />
+
+      {/* Slim discreet ivory header */}
+      <header className="px-3 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/95 backdrop-blur-xs flex justify-between items-center text-xs border-b border-[#E2DDD2]/70 shrink-0 z-20 select-none">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="font-bold text-[#123829] bg-white border border-[#E2DDD2] px-2.5 py-0.5 rounded-full shadow-xs">
+            {competitiveView ? `Host + Player · ${nickname || 'Jogador'}` : 'Apresentador'}
+          </span>
+          <span className="font-mono font-bold text-[#555E57]">PIN: {pin}</span>
           {pin && (
             <a
               href={`/screen/${pin}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1 bg-[#151F2E] hover:bg-[#1C293D] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer border border-white/15"
+              className="px-2.5 py-0.5 bg-white hover:bg-[#F7F5EE] text-[#123829] text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 border border-[#E2DDD2] shadow-xs cursor-pointer"
             >
-              <span>Abrir telão</span>
-              <span className="text-[10px] text-slate-400">↗</span>
+              <span>Telão</span>
+              <span className="text-[10px] text-[#648B68]">↗</span>
             </a>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
-          <span className={`w-2 h-2 rounded-full ${connectedPlayers > 0 ? 'bg-[#1FD4A7] animate-pulse' : 'bg-slate-500'}`} />
-          <span><strong className="text-white font-bold">{players.length}</strong> participantes • <strong className="text-white font-bold">{connectedPlayers}</strong> conectados</span>
+        <div className="flex items-center gap-2 text-xs text-[#555E57]">
+          <span className={`w-2 h-2 rounded-full ${connectedPlayers > 0 ? 'bg-[#2D8058] animate-pulse' : 'bg-slate-400'}`} />
+          <span><strong className="text-[#122017]">{connectedPlayers}</strong> conectados</span>
         </div>
       </header>
 
       {restorationError && (
-        <div role="alert" className="m-4 rounded-xl border border-amber-400/50 bg-amber-950/80 p-3 text-center font-bold text-amber-100 text-xs sm:text-sm">
+        <div role="alert" className="m-3 rounded-xl border border-amber-400/50 bg-[#FEF9EE] p-2.5 text-center font-bold text-[#B45309] text-xs sm:text-sm">
           {restorationError}
         </div>
       )}
 
-      <main className="flex-1 flex flex-col p-4 sm:p-6">
+      {/* Main gameplay viewport directly on ivory canvas */}
+      <main className="flex-1 flex flex-col min-h-0 w-full">
         {renderContent()}
       </main>
 
-      <footer className="p-4 bg-[#0E1522] border-t border-white/10">
+      {/* Secondary ivory controls bar */}
+      <footer className="px-2.5 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/95 backdrop-blur-xs border-t border-[#E2DDD2]/70 shrink-0 z-20">
         <HostControls roomState={roomState} adminConnectionState={hostSocket.connectionState} />
       </footer>
     </div>

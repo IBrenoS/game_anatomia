@@ -77,12 +77,13 @@ describe('Pacote Corretivo V3.1 — gate mecânico', () => {
     expect(ctx.simulateWebSocketMessage(client.socket, 'ping', now)).toBe(true);
   }
 
-  it('T31/T32: permanece ativa em 10s, 30s e 59.999s e encerra exatamente em 60s', async () => {
+  it('T31/T32: permanece ativa antes do deadline e encerra exatamente aos 20s', async () => {
     const host = await connect('host');
     const player = await connect('player', 'Alice');
     const questionStartedAt = await startQuestion(host);
+    const question = questions[0];
 
-    for (const elapsed of [10_000, 30_000, 59_999]) {
+    for (const elapsed of [5_000, 10_000, question.durationMs - 1]) {
       const now = questionStartedAt + elapsed;
       vi.setSystemTime(now);
       keepAlive(player, now);
@@ -90,7 +91,7 @@ describe('Pacote Corretivo V3.1 — gate mecânico', () => {
       expect((room as any).room.status, `estado em ${elapsed}ms`).toBe(GameState.QUESTION_ACTIVE);
     }
 
-    vi.setSystemTime(questionStartedAt + 60_000);
+    vi.setSystemTime(questionStartedAt + question.durationMs);
     await room.alarm();
     expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
     expect((room as any).getCurrentRound().endReason).toBe('deadline');
@@ -122,7 +123,7 @@ describe('Pacote Corretivo V3.1 — gate mecânico', () => {
     keepAlive(bob, expiryTime);
     await room.alarm();
 
-    expect(expiryTime).toBeLessThan(questionStartedAt + 60_000);
+    expect(expiryTime).toBeLessThan(questionStartedAt + question.durationMs);
     expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
     expect((room as any).getCurrentRound().endReason).toBe('all_answered');
   });
@@ -131,7 +132,7 @@ describe('Pacote Corretivo V3.1 — gate mecânico', () => {
     const host = await connect('host');
     await connect('player', 'Alice');
     const questionStartedAt = await startQuestion(host);
-    const originalDeadline = questionStartedAt + 60_000;
+    const originalDeadline = questionStartedAt + questions[0].durationMs;
 
     vi.setSystemTime(questionStartedAt + 5_000);
     await host.send(ClientEventType.HOST_COMMAND, {

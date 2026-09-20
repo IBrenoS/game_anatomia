@@ -1,22 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Batalha Anatômica — Full 10-Question Arena E2E Suite (Section 9 / P0.10–P0.24)
+ * Batalha Anatômica — Full 15-Question Arena E2E Suite (Section 9 / P0.10–P0.24)
  * Mandatory Requirements:
  * - Host + 2 Players (Alice + Bob) + Screen
- * - Complete 10 questions without clicking "Próxima pergunta" or "Ver classificação"
+ * - Complete 15 questions without clicking "Próxima pergunta" or "Ver classificação"
  * - Observe game as a real user via automated server transitions
  * - Duplicate nickname validation
  * - Mid-game reload/reconnection preserving state
- * - Question 10 DESAFIO FINAL visual treatment
+ * - Question 15 DESAFIO FINAL visual treatment
  * - Automatic transition: QUESTION_ACTIVE -> QUESTION_REVEAL (5s) -> ROUND_RANKING (5s) -> COUNTDOWN (3s) -> next
- * - Question 10 -> QUESTION_REVEAL (5s) -> FINAL_RANKING (5s) -> PODIUM (10s) -> FINISHED
+ * - Question 15 -> QUESTION_REVEAL (5s) -> FINAL_RANKING (5s) -> PODIUM (10s) -> FINISHED
  * - Adaptive podium for 2 participants
  * - FINISHED navigation: player returns to home, host creates new game
  */
 
-test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite', () => {
-  test('Full Arena Game Lifecycle: Host + Screen + 2 Players through 10 Questions to Podium & Finished (Fully Automated Loop)', async ({
+test.describe('Batalha Anatômica — Complete Automated 15-Question E2E Suite', () => {
+  test('Full Arena Game Lifecycle: Host + Screen + 2 Players through 15 Questions to Podium & Finished (Fully Automated Loop)', async ({
     browser,
   }) => {
     test.setTimeout(240_000);
@@ -114,16 +114,16 @@ test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite',
     await expect(bobPage.getByText(/prepare-se/i)).toBeVisible({ timeout: 5000 });
 
     // -------------------------------------------------------------
-    // 6. Execute All 10 Questions via Automated Game Loop (NO MANUAL ADVANCE CLICKS!)
+    // 6. Execute All 15 Questions via Automated Game Loop (NO MANUAL ADVANCE CLICKS!)
     // -------------------------------------------------------------
-    for (let qNum = 1; qNum <= 10; qNum++) {
+    for (let qNum = 1; qNum <= 15; qNum++) {
       // A. Verify question is active across clients
-      const qProgress = new RegExp(`questão ${qNum} de 10`, 'i');
+      const qProgress = new RegExp(`questão ${qNum} de 15`, 'i');
       await expect(alicePage.getByText(qProgress)).toBeVisible({ timeout: 15000 });
       await expect(bobPage.getByText(qProgress)).toBeVisible({ timeout: 15000 });
 
-      // Special visual atmosphere on Question 10 (P1.14)
-      if (qNum === 10) {
+      // Special visual atmosphere on Question 15 (P1.14)
+      if (qNum === 15) {
         await expect(alicePage.getByText(/desafio final/i)).toBeVisible();
         await expect(screenPage.getByText(/desafio final/i)).toBeVisible();
       }
@@ -157,20 +157,20 @@ test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite',
       await expect(bobPage.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
 
       // D. Automatic Advancement (NO HOST CLICKS!)
-      if (qNum < 10) {
+      if (qNum < 15) {
         // Automatically transitions to ROUND_RANKING (~5s alarm)
         await expect(screenPage.getByText(/top 5 da batalha/i)).toBeVisible({ timeout: 10000 });
 
         // Automatically transitions to COUNTDOWN (3s) and then next QUESTION_ACTIVE
         // The loop will wait for next question's qProgress on top of next iteration!
       } else {
-        // Question 10: Automatically transitions to FINAL_RANKING (~5s alarm)
+        // Question 15: Automatically transitions to FINAL_RANKING (~5s alarm)
         await expect(screenPage.getByText(/classificação final/i)).toBeVisible({ timeout: 10000 });
       }
     }
 
     // -------------------------------------------------------------
-    // 7. Question 10 -> Automated Podium Ceremony (~5s alarm)
+    // 7. Question 15 -> Automated Podium Ceremony (~5s alarm)
     // -------------------------------------------------------------
     // Automatically transitions from FINAL_RANKING to PODIUM
     await expect(screenPage.getByText(/pódio dos campeões/i)).toBeVisible({ timeout: 10000 });

@@ -147,4 +147,20 @@ describe('PlayerQuestion UI Component (V32-T05A/B/C/D)', () => {
     expect(html).toContain('disabled=""');
     expect(html).toContain('Resposta registrada!');
   });
+
+  it('exibe o progresso de uma partida com 15 questões', () => {
+    const html = renderToString(
+      React.createElement(PlayerQuestion, {
+        question: mockQuestion,
+        currentQuestionIndex: 0,
+        startedAt: 1000,
+        deadlineAt: 21000,
+        selectedOptionId: null,
+        answerSubmitted: false,
+        roomState: 'QUESTION_ACTIVE',
+      })
+    );
+
+    expect(html).toContain('Questão 1 de 15');
+  });
 });

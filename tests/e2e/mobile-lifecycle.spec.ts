@@ -119,13 +119,13 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     await startPartidaBtn.click();
 
     // Host enters active question
-    await expect(hostPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 15000 });
+    await expect(hostPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player returns to foreground WITHOUT manual reload
     await simulateForeground(mobilePage);
 
     // Convergence check: Mobile player is in QUESTION_ACTIVE with active options
-    await expect(mobilePage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10000 });
+    await expect(mobilePage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 10000 });
     const optA = mobilePage.getByRole('button', { name: /alternativa a/i }).first();
     await expect(optA).toBeVisible({ timeout: 5000 });
 
@@ -179,13 +179,13 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     await simulateBackground(mobilePage);
 
     // Host automatically enters Question 2 (~5s)
-    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 15000 });
+    await expect(hostPage.getByText(/questão 2 de 15/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player returns to foreground WITHOUT manual reload
     await simulateForeground(mobilePage);
 
     // Convergence check: Mobile player automatically converges to Question 2
-    await expect(mobilePage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 10000 });
+    await expect(mobilePage.getByText(/questão 2 de 15/i)).toBeVisible({ timeout: 10000 });
 
     // Ensure options are fresh and clickable (NO leftover submitted state from Question 1!)
     const optB_Q2 = mobilePage.getByRole('button', { name: /alternativa b/i }).first();
@@ -238,13 +238,13 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const startPartidaBtn = hostPage.getByRole('button', { name: /iniciar partida/i }).first();
     await expect(startPartidaBtn).toBeVisible({ timeout: 5000 });
     await startPartidaBtn.click();
-    await expect(hostPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 15000 });
+    await expect(hostPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player returns to foreground (triggers reconnect + RESUME_SESSION)
     await simulateForeground(mobilePage);
 
     // Convergence check: Player reconnects via RESUME_SESSION and converges to QUESTION_ACTIVE
-    await expect(mobilePage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(mobilePage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
     const optA = mobilePage.getByRole('button', { name: /alternativa a/i }).first();
     await expect(optA).toBeVisible({ timeout: 5000 });
 
@@ -287,13 +287,13 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     await simulateBackgroundWithSocketDrop(mobilePage);
 
     // Host automatically advances to Question 2 (~5s)
-    await expect(hostPage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 15000 });
+    await expect(hostPage.getByText(/questão 2 de 15/i)).toBeVisible({ timeout: 15000 });
 
     // Return to foreground
     await simulateForeground(mobilePage);
 
     // Convergence check: Player converges to Question 2 with fresh interactive buttons
-    await expect(mobilePage.getByText(/questão 2 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(mobilePage.getByText(/questão 2 de 15/i)).toBeVisible({ timeout: 12000 });
     const optC_Q2 = mobilePage.getByRole('button', { name: /alternativa c/i }).first();
     await expect(optC_Q2).toBeVisible({ timeout: 5000 });
     await optC_Q2.click();
@@ -326,7 +326,7 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
 
     // Start game
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(mobilePage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 15000 });
+    await expect(mobilePage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 15000 });
 
     // Mobile player immediately goes to background WITHOUT answering
     await simulateBackground(mobilePage);

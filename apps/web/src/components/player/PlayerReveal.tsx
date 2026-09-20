@@ -11,125 +11,298 @@ interface PlayerRevealProps {
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
-export default function PlayerReveal({ result, correctOptionId, question: propQuestion }: PlayerRevealProps) {
+export default function PlayerReveal({
+  result,
+  correctOptionId,
+  question: propQuestion,
+}: PlayerRevealProps) {
   const storeQuestion = useGameStore((s) => s.currentQuestion);
   const personalScore = useGameStore((s) => s.personalScore);
 
   const question = propQuestion || storeQuestion;
-  const correctOption = question?.options?.find(o => o.id === correctOptionId);
-  const correctIndex = question?.options?.findIndex(o => o.id === correctOptionId);
-  const correctLetter = correctIndex !== undefined && correctIndex >= 0 ? OPTION_LETTERS[correctIndex] : null;
+  const correctOption = question?.options?.find((o) => o.id === correctOptionId);
+  const correctIndex = question?.options?.findIndex((o) => o.id === correctOptionId);
+  const correctLetter =
+    correctIndex !== undefined && correctIndex >= 0 ? OPTION_LETTERS[correctIndex] : null;
 
   useEffect(() => {
     soundManager.playRevealChime(result?.correct);
   }, [result]);
 
+  const basePoints = question?.basePoints || 100;
+  const totalPoints = personalScore.totalPoints;
+
+  // P10: Timeout / No answer sent
   if (!result || !result.selectedOptionId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-white p-6 text-center max-w-sm mx-auto select-none">
-        <div className="w-20 h-20 bg-amber-600/30 rounded-full flex items-center justify-center mb-4 text-4xl border border-amber-400/40">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 select-none w-full max-w-2xl mx-auto text-center animate-scale-in">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center mb-4">
+          <span className="text-[11px] sm:text-xs font-black tracking-widest text-[#123829] uppercase">
+            BATALHA ANATÔMICA
+          </span>
+          <span className="text-[10px] sm:text-[11px] font-bold tracking-wider text-[#648B68] uppercase">
+            BOVINO <span className="text-[#D05F36]">×</span> EQUINO
+          </span>
+        </div>
+
+        {/* Amber Clock Icon */}
+        <div className="w-16 h-16 rounded-full bg-[#C47A2C] text-white flex items-center justify-center text-3xl shadow-lg shadow-[#C47A2C]/25 mb-3 animate-scale-in">
           ⏱
         </div>
-        <h2 className="text-3xl font-black mb-2 text-yellow-300">Tempo Esgotado!</h2>
-        <p className="text-sm text-blue-200 mb-4">
-          Sem resposta nesta rodada. Você não enviou uma alternativa a tempo.
+
+        {/* Status badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FBEBE8] border border-[#D05F36]/30 text-[#C95A34] text-[11px] font-black tracking-wider uppercase mb-3 shadow-xs">
+          Tempo Esgotado
+        </div>
+
+        {/* Title & Subtitle */}
+        <h1 className="text-2xl sm:text-4xl font-black text-[#122017] tracking-tight mb-1">
+          O tempo acabou.
+        </h1>
+        <p className="text-xs sm:text-sm text-[#555E57] font-medium mb-1">
+          Você não enviou uma alternativa nesta rodada.
+        </p>
+        <p className="text-xs text-[#8C4328] font-bold mb-6">
+          Sem resposta nesta rodada.
         </p>
 
+        {/* Correct Answer Display */}
         {correctOption && (
-          <div className="w-full bg-black/40 p-4 rounded-2xl border border-white/15 my-3 text-left">
-            <span className="text-xs uppercase font-bold tracking-wider text-green-300 block mb-1">
-              Gabarito Oficial
-            </span>
-            <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 rounded-lg bg-green-500 text-slate-950 font-black text-sm flex items-center justify-center shrink-0">
+          <div className="w-full max-w-md bg-white border-2 border-[#2D8058] rounded-2xl p-3.5 sm:p-4 my-2 text-left shadow-xs">
+            <div className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-[#2D8058] text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
                 {correctLetter || '✓'}
               </span>
-              <span className="text-sm font-bold text-white leading-snug">
+              <span className="text-sm sm:text-base font-bold text-[#122017] leading-snug flex-1">
                 {correctOption.label}
+              </span>
+            </div>
+            <div className="mt-2 pt-2 border-t border-[#E2DDD2] flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-black tracking-wider text-[#2D8058] bg-[#EAF5EC] px-2 py-0.5 rounded-full border border-[#2D8058]/30">
+                GABARITO OFICIAL
+              </span>
+              <span className="text-[11px] text-[#64748B] font-medium">
+                Revise antes da classificação
               </span>
             </div>
           </div>
         )}
 
-        <div className="bg-black/30 px-4 py-2 rounded-xl border border-white/10 mt-2 text-xs text-blue-200">
-          Pontuação Acumulada: <strong className="text-yellow-300 font-mono text-sm">{personalScore.totalPoints} pts</strong>
+        {/* Cumulative Score */}
+        <div className="w-full max-w-md bg-white border border-[#E2DDD2] rounded-2xl p-3.5 sm:p-4 mt-3 flex justify-between items-center px-5 shadow-xs">
+          <span className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
+            Pontuação acumulada
+          </span>
+          <span className="text-lg sm:text-xl font-mono font-black text-[#122017]">
+            {totalPoints} pts
+          </span>
         </div>
 
-        <p className="text-xs text-blue-300/70 mt-6">
-          Observe a explicação detalhada no telão principal.
+        {/* Footer note */}
+        <p className="text-xs text-[#64748B] mt-6 font-semibold">
+          Veja como ficou o ranking
         </p>
       </div>
     );
   }
 
   const { correct, awardedPoints, responseTimeMs } = result;
-  const hadBonus = correct && responseTimeMs <= 10000;
+  const hasSpeedBonus = correct && (responseTimeMs <= 10000 || awardedPoints > basePoints);
+  const bonusPoints = Math.max(0, awardedPoints - basePoints);
+  const responseTimeSec = (responseTimeMs / 1000).toFixed(2);
 
   return (
-    <div className={`flex-1 flex flex-col items-center justify-center text-white p-6 max-w-sm mx-auto w-full rounded-3xl text-center shadow-2xl border select-none ${
-      correct ? 'bg-green-950/70 border-green-500/40' : 'bg-red-950/70 border-red-500/40'
-    }`}>
-      {/* Icon Badge */}
-      <div className={`w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 shadow-xl ${
-        correct ? 'bg-green-500 text-white shadow-[0_0_25px_rgba(34,197,94,0.6)]' : 'bg-red-500 text-white shadow-[0_0_25px_rgba(239,68,68,0.6)]'
-      }`}>
-        {correct ? '✓' : '✗'}
-      </div>
-      
-      {/* Status Heading */}
-      <h2 className="text-2xl sm:text-3xl font-black mb-1">
-        {correct ? 'Você Acertou!' : 'Resposta Incorreta'}
-      </h2>
-
-      {/* Round Points & Bonus */}
-      <div className="mt-3 flex flex-col items-center bg-black/40 p-4 rounded-2xl w-full border border-white/10">
-        <span className="text-[11px] uppercase font-bold tracking-widest text-slate-300 mb-0.5">
-          Pontos Conquistados na Rodada
-        </span>
-        <span className="text-4xl font-mono font-black text-yellow-300">
-          +{awardedPoints} <span className="text-sm font-sans text-white/80">pts</span>
-        </span>
-        {hadBonus && (
-          <span className="text-xs font-bold bg-yellow-500/20 text-yellow-300 px-3 py-1 rounded-full border border-yellow-500/40 mt-2 flex items-center gap-1">
-            ⚡ Bônus de Rapidez (+25%)
+    <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 select-none w-full max-w-2xl mx-auto text-center animate-scale-in">
+      {/* Brand Header */}
+      <div className="flex flex-col items-center mb-4">
+          <span className="text-[11px] sm:text-xs font-black tracking-widest text-[#123829] uppercase">
+            BATALHA ANATÔMICA
           </span>
-        )}
-        <span className="text-xs text-blue-200 mt-1">
-          Tempo de Resposta: {(responseTimeMs / 1000).toFixed(2)}s
-        </span>
-      </div>
-
-      {/* Correct Alternative Display */}
-      {correctOption && (
-        <div className="w-full bg-black/40 p-3.5 rounded-2xl border border-green-500/30 my-3 text-left">
-          <span className="text-[11px] uppercase font-bold tracking-wider text-green-300 block mb-1">
-            Gabarito Oficial
+          <span className="text-[10px] sm:text-[11px] font-bold tracking-wider text-[#648B68] uppercase">
+            BOVINO <span className="text-[#D05F36]">×</span> EQUINO
           </span>
-          <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 rounded-lg bg-green-400 text-slate-950 font-black text-sm flex items-center justify-center shrink-0">
-              {correctLetter || '✓'}
-            </span>
-            <span className="text-sm font-bold text-white leading-snug">
-              {correctOption.label}
-            </span>
-          </div>
         </div>
-      )}
 
-      {/* Cumulative Score */}
-      <div className="w-full bg-blue-950/60 p-3 rounded-2xl border border-blue-400/30 flex justify-between items-center px-4">
-        <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">
-          Pontuação Acumulada
-        </span>
-        <span className="text-lg font-mono font-black text-yellow-300">
-          {personalScore.totalPoints} pts
-        </span>
+        {correct ? (
+          hasSpeedBonus ? (
+            /* P08: Resposta Correta + Bônus de Rapidez */
+            <>
+              {/* Badge Icon with speed radiance */}
+              <div className="relative my-2">
+                <div className="w-16 h-16 rounded-full bg-[#123829] text-white flex items-center justify-center text-3xl shadow-xl shadow-[#123829]/30 relative z-10 animate-check-pop">
+                  ✓
+                </div>
+                {/* Golden ambient glow */}
+                <div className="absolute inset-0 rounded-full bg-[#F59E0B]/30 blur-xl animate-gold-glow pointer-events-none" />
+              </div>
+
+              {/* Title & Time */}
+              <h1 className="text-2xl sm:text-4xl font-black text-[#122017] tracking-tight mt-2 mb-0.5">
+                Resposta certeira.
+              </h1>
+              <p className="text-xs sm:text-sm font-black text-[#D48B28] mb-6 flex items-center justify-center gap-1.5">
+                <span className="text-[#123829] font-black">Você acertou!</span>
+                <span>{`Você respondeu em ${responseTimeSec}s`}</span>
+              </p>
+
+              {/* Points Card with breakdown and horizontal speed lines */}
+              <div className="relative w-full max-w-md my-2">
+                {/* Horizontal speed lines decoration */}
+                <div className="absolute -left-4 -right-4 top-1/2 -translate-y-1/2 h-16 pointer-events-none flex flex-col justify-between opacity-30 animate-speed-lines">
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#F59E0B] to-transparent" />
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#F59E0B] to-transparent" />
+                  <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-[#F59E0B] to-transparent" />
+                </div>
+
+                <div className="bg-white border border-[#E2DDD2] rounded-2xl p-4 sm:p-5 shadow-md relative z-10">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] uppercase font-black tracking-wider text-[#64748B]">
+                      PONTOS DA RODADA
+                    </span>
+                    <span className="text-[11px] font-black text-[#B45309] bg-[#FEF9EE] border border-[#F59E0B]/50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      BÔNUS DE VELOCIDADE +25%
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline mt-2">
+                    <div className="text-4xl sm:text-5xl font-black font-mono text-[#122017]">
+                      {`+${awardedPoints}`}
+                    </div>
+                    <div className="text-xs sm:text-sm font-black text-[#64748B]">
+                      Pontuação acumulada: {`TOTAL ${totalPoints} pts`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Speed bonus callout pill */}
+              <div className="w-full max-w-md bg-[#FEF9EE] border border-[#F59E0B]/60 text-[#B45309] rounded-2xl py-2.5 px-4 font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs my-2 animate-gold-glow">
+                <span>{`⚡ +${bonusPoints > 0 ? bonusPoints : Math.round(basePoints * 0.25)} pts por velocidade`}</span>
+              </div>
+
+              {/* Correct Option Display */}
+              {correctOption && (
+                <div className="w-full max-w-md bg-white border-2 border-[#2D8058] rounded-2xl p-3 sm:p-3.5 my-1.5 flex items-center gap-3 text-left shadow-xs">
+                  <span className="w-7 h-7 rounded-xl bg-[#2D8058] text-white font-black text-xs flex items-center justify-center shrink-0">
+                    {correctLetter || '✓'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-[#122017] leading-snug flex-1">
+                    {correctOption.label}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            /* P07: Resposta Correta (Normal) */
+            <>
+              {/* Green Checkmark Badge */}
+              <div className="w-16 h-16 rounded-full bg-[#123829] text-white flex items-center justify-center text-3xl shadow-xl shadow-[#123829]/25 mb-3 animate-check-pop">
+                ✓
+              </div>
+
+              {/* Title & Subtitle */}
+              <h1 className="text-2xl sm:text-4xl font-black text-[#122017] tracking-tight mb-0.5">
+                Você acertou.
+              </h1>
+              <p className="text-xs sm:text-sm font-bold text-[#2D8058] mb-6">
+                Boa leitura anatômica.
+              </p>
+
+              {/* Points Card */}
+              <div className="w-full max-w-md bg-white border border-[#E2DDD2] rounded-2xl p-4 sm:p-5 shadow-xs my-2">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] uppercase font-black tracking-wider text-[#64748B]">
+                    PONTOS DA RODADA
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-[#64748B]">
+                    Pontuação acumulada: {`TOTAL ${totalPoints} pts`}
+                  </span>
+                </div>
+
+                <div className="text-left text-4xl sm:text-5xl font-black font-mono text-[#122017] mt-2">
+                  {`+${awardedPoints}`}
+                </div>
+              </div>
+
+              {/* Correct Option Card */}
+              {correctOption && (
+                <div className="w-full max-w-md bg-white border-2 border-[#2D8058] rounded-2xl p-3 sm:p-3.5 my-2 flex items-center gap-3 text-left shadow-xs">
+                  <span className="w-7 h-7 rounded-xl bg-[#2D8058] text-white font-black text-xs flex items-center justify-center shrink-0">
+                    {correctLetter || '✓'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-[#122017] leading-snug flex-1">
+                    {correctOption.label}
+                  </span>
+                </div>
+              )}
+            </>
+          )
+        ) : (
+          /* P09: Resposta Incorreta */
+          <>
+            {/* Terracotta Cross Badge */}
+            <div className="w-16 h-16 rounded-full bg-[#C95A34] text-white flex items-center justify-center text-3xl shadow-xl shadow-[#C95A34]/30 mb-3 animate-scale-in">
+              ✗
+            </div>
+
+            {/* Section Pill */}
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FBEBE8] border border-[#D05F36]/30 text-[#C95A34] text-[11px] font-black tracking-wider uppercase mb-3 shadow-xs">
+              Resposta Incorreta
+            </div>
+
+            {/* Title & Subtitle */}
+            <h1 className="text-2xl sm:text-4xl font-black text-[#122017] tracking-tight mb-0.5">
+              Não foi dessa vez.
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-[#8C4328] mb-6">
+              Confira a resposta correta e siga para a próxima.
+            </p>
+
+            {/* Points Card */}
+            <div className="w-full max-w-md bg-white border border-[#E2DDD2] rounded-2xl p-4 sm:p-5 shadow-xs my-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-[11px] uppercase font-black tracking-wider text-[#64748B]">
+                  PONTOS DA RODADA
+                </span>
+                <span className="text-xs sm:text-sm font-black text-[#64748B]">
+                  Pontuação acumulada: TOTAL <span className="font-mono text-[#122017]">{totalPoints} pts</span>
+                </span>
+              </div>
+
+              <div className="text-left text-4xl sm:text-5xl font-black font-mono text-[#122017] mt-2">
+                +0
+              </div>
+            </div>
+
+            {/* Correct Option Card */}
+            {correctOption && (
+              <div className="w-full max-w-md bg-white border-2 border-[#2D8058] rounded-2xl p-3.5 sm:p-4 my-2 text-left shadow-xs">
+                <div className="flex items-center gap-3">
+                  <span className="w-7 h-7 rounded-xl bg-[#2D8058] text-white font-black text-xs flex items-center justify-center shrink-0">
+                    {correctLetter || '✓'}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-[#122017] leading-snug flex-1">
+                    {correctOption.label}
+                  </span>
+                </div>
+                <div className="mt-2 pt-2 border-t border-[#E2DDD2] flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-[#2D8058] bg-[#EAF5EC] px-2 py-0.5 rounded-full border border-[#2D8058]/30">
+                    RESPOSTA CORRETA
+                  </span>
+                  <span className="text-[11px] text-[#64748B] font-medium">
+                    Revise o gabarito antes do ranking
+                  </span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Footer Guidance */}
+        <p className="text-xs text-[#64748B] mt-6 font-semibold">
+          Veja como ficou o ranking
+        </p>
       </div>
-      
-      <div className="mt-4 text-xs text-blue-300/80 font-medium flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-        <span>Avançando para a classificação em instantes...</span>
-      </div>
-    </div>
-  );
-}
+    );
+  }

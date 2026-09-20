@@ -76,18 +76,18 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
       }
       case 'QUESTION_ACTIVE':
         return (
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button 
               type="button"
               onClick={() => handleCommand('PAUSE')}
-              className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#C95A34] hover:bg-[#B04A27] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
             >
-              ⏸ Pausar Rodada
+              ⏸ Pausar
             </button>
             <button 
               type="button"
               onClick={() => setConfirmAction('END_QUESTION')}
-              className="px-5 py-2.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
             >
               ⏹ Encerrar Questão
             </button>
@@ -95,18 +95,18 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
         );
       case 'PAUSED':
         return (
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button 
               type="button"
               onClick={() => handleCommand('RESUME')}
-              className="px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#123829] hover:bg-[#1B4D3E] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
             >
-              ▶ Retomar Rodada
+              ▶ Retomar
             </button>
             <button 
               type="button"
               onClick={() => setConfirmAction('END_GAME')}
-              className="px-5 py-2.5 bg-red-700 hover:bg-red-600 text-white font-bold rounded-xl shadow transition-all cursor-pointer"
+              className="px-3.5 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
             >
               Finalizar Partida
             </button>
@@ -114,36 +114,36 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
         );
       case 'QUESTION_REVEAL':
         return (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#123829] font-semibold flex items-center gap-1.5 bg-[#EAF5EC] px-3 py-1 rounded-full border border-[#2D8058]/30">
+              <span className="w-2 h-2 rounded-full bg-[#2D8058] animate-pulse" />
               Avanço automático em ~5s
             </span>
           </div>
         );
       case 'ROUND_RANKING':
         return (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#123829] font-semibold flex items-center gap-1.5 bg-[#EAF5EC] px-3 py-1 rounded-full border border-[#2D8058]/30">
+              <span className="w-2 h-2 rounded-full bg-[#2D8058] animate-pulse" />
               Próxima questão em ~5s
             </span>
           </div>
         );
       case 'FINAL_RANKING':
         return (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-yellow-200 font-medium flex items-center gap-1.5 bg-yellow-950/40 px-3 py-1.5 rounded-lg border border-yellow-400/20">
-              <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#B45309] font-semibold flex items-center gap-1.5 bg-[#FEF9EE] px-3 py-1 rounded-full border border-[#F59E0B]/40">
+              <span className="w-2 h-2 rounded-full bg-[#F59E0B] animate-pulse" />
               Pódio iniciando em ~5s
             </span>
           </div>
         );
       case 'PODIUM':
         return (
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-blue-200 font-medium flex items-center gap-1.5 bg-blue-950/40 px-3 py-1.5 rounded-lg border border-blue-400/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#123829] font-semibold flex items-center gap-1.5 bg-[#EAF5EC] px-3 py-1 rounded-full border border-[#2D8058]/30">
+              <span className="w-2 h-2 rounded-full bg-[#2D8058] animate-pulse" />
               Encerramento automático em ~10s
             </span>
           </div>
@@ -154,16 +154,16 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
   };
 
   return (
-    <div className="flex flex-wrap justify-between items-center gap-4">
+    <div className="flex flex-wrap justify-between items-center gap-2 sm:gap-3">
       {/* Controles locais (FR 032) */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <button
           type="button"
           onClick={handleToggleSound}
-          className={`p-2.5 rounded-xl border text-sm font-semibold transition-all ${
+          className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs ${
             soundEnabled
-              ? 'bg-blue-600/30 border-blue-400/40 text-blue-200'
-              : 'bg-white/5 border-white/10 text-white/50'
+              ? 'bg-[#EAF5EC] border-[#2D8058]/40 text-[#2D8058]'
+              : 'bg-white border-[#E2DDD2] text-[#555E57] hover:bg-[#F7F5EE]'
           }`}
           title="Alternar áudio local"
           aria-label={soundEnabled ? 'Desativar som local' : 'Ativar som local'}
@@ -173,31 +173,31 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
         <button
           type="button"
           onClick={handleToggleFullscreen}
-          className="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-semibold text-white/80 transition-all cursor-pointer"
+          className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-[#E2DDD2] bg-white hover:bg-[#F7F5EE] text-xs font-bold text-[#122017] transition-all cursor-pointer shadow-xs"
           title="Alternar tela cheia"
           aria-label="Alternar tela cheia"
         >
-          {isFullscreen ? '⛶ Sair da Tela Cheia' : '⛶ Tela Cheia'}
+          {isFullscreen ? '⛶ Sair' : '⛶ Tela Cheia'}
         </button>
         {pin && (
           <a
             href={`/screen/${pin}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2.5 rounded-xl border border-blue-400/40 bg-blue-600/30 hover:bg-blue-600/50 text-sm font-semibold text-blue-100 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+            className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-[#E2DDD2] bg-white hover:bg-[#F7F5EE] text-xs font-bold text-[#122017] transition-all flex items-center gap-1 cursor-pointer shadow-xs active:scale-95"
             title="Abrir Telão em nova aba"
             aria-label="Abrir Telão em nova aba"
           >
             <span>📺</span>
-            <span className="hidden sm:inline">Abrir Telão</span>
+            <span className="hidden sm:inline">Telão</span>
           </a>
         )}
       </div>
 
       {/* Ações de controle de estado */}
-      <fieldset disabled={adminConnectionState !== 'connected'} className="flex items-center gap-3 disabled:opacity-60">
+      <fieldset disabled={adminConnectionState !== 'connected'} className="flex items-center gap-1.5 sm:gap-2 disabled:opacity-60">
         {adminConnectionState !== 'connected' ? (
-          <span role="status" className="text-sm font-bold text-amber-200">
+          <span role="status" className="text-xs font-bold text-[#C95A34]">
             Reconectando controles da partida…
           </span>
         ) : renderStateButtons()}

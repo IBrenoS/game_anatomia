@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useGameStore } from '../stores/gameStore.js';
 import { useGameSocket } from '../hooks/useGameSocket.js';
@@ -10,6 +10,7 @@ import PlayerRanking from '../components/player/PlayerRanking.js';
 import PlayerPodium from '../components/player/PlayerPodium.js';
 import PlayerFinished from '../components/player/PlayerFinished.js';
 import ReconnectOverlay from '../components/player/ReconnectOverlay.js';
+import ConnectionRestoredToast from '../components/player/ConnectionRestoredToast.js';
 
 export function PlayerPage() {
   const { pin } = useParams<{ pin: string }>();
@@ -32,8 +33,23 @@ export function PlayerPage() {
   const rankings = useGameStore((s) => s.rankings);
   const isFinalRanking = useGameStore((s) => s.isFinalRanking);
   const podium = useGameStore((s) => s.podium);
+  const totalPlayers = useGameStore((s) => s.totalPlayers);
+  const previousRankings = useGameStore((s) => s.previousRankings);
 
-  const personalRanking = rankings.find(r => r.playerId === playerId);
+  const personalRanking = rankings.find((r) => r.playerId === playerId);
+
+  // Track reconnection restoration for P16 toast
+  const [showRestoredToast, setShowRestoredToast] = useState(false);
+  const prevConnectionState = useRef(connectionState);
+
+  useEffect(() => {
+    if (prevConnectionState.current === 'reconnecting' && connectionState === 'connected') {
+      setShowRestoredToast(true);
+      const timer = setTimeout(() => setShowRestoredToast(false), 3500);
+      return () => clearTimeout(timer);
+    }
+    prevConnectionState.current = connectionState;
+  }, [connectionState]);
 
   useEffect(() => {
     if (!pin) {
@@ -51,13 +67,36 @@ export function PlayerPage() {
     }
   }, [pin, connectionState, playerId, connect, manager, navigate]);
 
+  const isGameplay = Boolean(
+    roomState &&
+      roomState !== 'LOBBY'
+  );
+
+  // Sync body and documentElement background color based on game state (dark for pre-game, ivory for gameplay)
+  useEffect(() => {
+    if (isGameplay) {
+      document.body.style.backgroundColor = '#FAF8F3';
+      document.body.style.color = '#122017';
+      document.documentElement.style.backgroundColor = '#FAF8F3';
+    } else {
+      document.body.style.backgroundColor = '#080C11';
+      document.body.style.color = '#FAF7F2';
+      document.documentElement.style.backgroundColor = '#080C11';
+    }
+    return () => {
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
+      document.documentElement.style.backgroundColor = '';
+    };
+  }, [isGameplay]);
+
   const isConnected = connectionState === 'connected' || manager.state === 'connected';
   if (!isConnected && (connectionState === 'disconnected' || connectionState === 'connecting')) {
     return (
-      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex items-center justify-center p-4 text-center">
+      <div className="min-h-screen dark-arena-bg text-[#FAF7F2] flex items-center justify-center p-4 text-center select-none">
         <div className="flex flex-col items-center space-y-4">
           <div className="w-10 h-10 border-3 border-[#1FD4A7] border-t-transparent rounded-full animate-spin" />
-          <p className="text-base font-bold text-slate-300">Conectando ao jogo...</p>
+          <p className="text-sm sm:text-base font-bold text-slate-300">Conectando à arena...</p>
         </div>
       </div>
     );
@@ -66,7 +105,7 @@ export function PlayerPage() {
   const renderContent = () => {
     switch (roomState) {
       case 'LOBBY':
-        return <PlayerLobby nickname={nickname} />;
+        return <PlayerLobby nickname={nickname} totalPlayers={totalPlayers} />;
       case 'COUNTDOWN':
         return <PlayerCountdown />;
       case 'QUESTION_ACTIVE':
@@ -85,31 +124,59 @@ export function PlayerPage() {
           />
         );
       case 'QUESTION_REVEAL':
-        return <PlayerReveal result={personalResult} correctOptionId={correctOptionId} question={currentQuestion} />;
+        return (
+          <PlayerReveal
+            result={personalResult}
+            correctOptionId={correctOptionId}
+            question={currentQuestion}
+          />
+        );
       case 'ROUND_RANKING':
       case 'FINAL_RANKING':
-        return <PlayerRanking ranking={personalRanking} isFinal={isFinalRanking} />;
+        return (
+          <PlayerRanking
+            ranking={personalRanking}
+            isFinal={isFinalRanking}
+            previousRankings={previousRankings}
+          />
+        );
       case 'PODIUM':
         return <PlayerPodium podium={podium} playerId={playerId} />;
       case 'FINISHED':
         return <PlayerFinished ranking={personalRanking} />;
       default:
-        return <div className="flex-1 flex items-center justify-center text-white">Aguarde...</div>;
+        return (
+          <div className="flex-1 flex items-center justify-center text-slate-300">
+            Aguarde o próximo comando da arena...
+          </div>
+        );
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col relative overflow-hidden">
-      <ReconnectOverlay isReconnecting={connectionState === 'reconnecting'} />
-      {roomState !== 'LOBBY' && (
-        <header className="p-3 bg-[#0E1522] flex justify-between items-center text-xs sm:text-sm border-b border-white/10">
-          <span className="font-mono font-bold text-slate-300">PIN: {pin}</span>
-          <span className="font-bold text-[#1FD4A7] bg-[#123829] border border-[#1FD4A7]/30 px-3 py-0.5 rounded-full">
+    <div
+      className={`min-h-screen ${
+        isGameplay ? 'gameplay-canvas bg-[#FAF8F3] text-[#122017]' : 'dark-arena-bg text-[#FAF7F2]'
+      } flex flex-col relative overflow-x-hidden`}
+    >
+      {/* P15: Reconnect Overlay (System layer over the battle) */}
+      <ReconnectOverlay isReconnecting={connectionState === 'reconnecting'} isGameplay={isGameplay} />
+
+      {/* P16: Connection Restored Toast */}
+      <ConnectionRestoredToast show={showRestoredToast} />
+
+      {/* Subtle Top Metadata Bar (PIN and Player Nickname) */}
+      {isGameplay && (
+        <header className="px-3 sm:px-6 py-1.5 sm:py-2 bg-[#FAF8F3]/90 backdrop-blur-xs flex justify-between items-center text-xs border-b border-[#E2DDD2]/60 shrink-0 z-20 select-none">
+          <span className="font-mono font-bold text-[#64748B]">PIN: {pin}</span>
+          <span className="font-bold text-[#123829] bg-white border border-[#E2DDD2] px-3 py-0.5 rounded-full shadow-xs">
             {nickname || 'Jogador'}
           </span>
         </header>
       )}
-      <main className="flex-1 flex flex-col p-4">
+
+      {/* Main Content Viewport */}
+      <main className="flex-1 flex flex-col min-h-0 w-full">
         {renderContent()}
       </main>
     </div>

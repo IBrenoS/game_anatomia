@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { PublicQuestion } from '@batalha/protocol';
+import { TOTAL_QUESTIONS, type PublicQuestion } from '@batalha/protocol';
 import { useGameStore } from '../../stores/gameStore.js';
 
 interface ScreenQuestionProps {
@@ -49,13 +49,13 @@ export default function ScreenQuestion({ question, currentQuestionIndex, deadlin
   return (
     <div className="flex flex-col h-full text-white p-8 md:p-10 max-w-7xl mx-auto w-full select-none justify-between">
       <div className="flex justify-between items-center mb-4">
-        {currentQuestionIndex === 9 ? (
+        {currentQuestionIndex === TOTAL_QUESTIONS - 1 ? (
           <span className="text-2xl md:text-3xl font-black text-amber-950 bg-gradient-to-r from-yellow-400 to-amber-500 px-6 py-2 rounded-2xl border-2 border-yellow-300 shadow-[0_0_25px_rgba(250,204,21,0.6)] animate-pulse uppercase tracking-wider">
-            🔥 DESAFIO FINAL (300 PTS) · Questão 10 de 10 🔥
+            {`🔥 DESAFIO FINAL (300 PTS) · Questão ${TOTAL_QUESTIONS} de ${TOTAL_QUESTIONS} 🔥`}
           </span>
         ) : (
           <span className="text-2xl md:text-3xl font-black text-blue-200 bg-blue-950/60 px-6 py-2 rounded-2xl border border-blue-400/30">
-            Questão {currentQuestionIndex + 1} de 10
+            Questão {currentQuestionIndex + 1} de {TOTAL_QUESTIONS}
           </span>
         )}
         <div className="flex items-center gap-4">

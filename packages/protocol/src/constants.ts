@@ -4,8 +4,8 @@
 /** PRD p.4: Maximum active players per room */
 export const MAX_PLAYERS_PER_ROOM = 50;
 
-/** PRD p.9: Default question duration in ms */
-export const DEFAULT_QUESTION_DURATION_MS = 60_000;
+/** Quiz de músculos: default question duration in ms */
+export const DEFAULT_QUESTION_DURATION_MS = 20_000;
 
 /** PRD p.9: Speed bonus window in ms (≤10s gets bonus) */
 export const SPEED_BONUS_WINDOW_MS = 10_000;
@@ -29,8 +29,8 @@ export const PRESENCE_TIMEOUT_MS = 10_000;
 /** PRD p.21: Room expires 24h after FINISHED */
 export const ROOM_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
-/** PRD p.2: Total number of questions */
-export const TOTAL_QUESTIONS = 10;
+/** Quiz de músculos: total number of questions */
+export const TOTAL_QUESTIONS = 15;
 
 /** PRD p.2: PIN length */
 export const PIN_LENGTH = 6;

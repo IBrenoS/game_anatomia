@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateQuestions, TOTAL_QUESTIONS, REQUIRED_MECHANICS } from '../validate';
+import { validateQuestions, TOTAL_QUESTIONS } from '../validate';
 import { questions } from '../questions';
 import type { Question, QuestionType } from '@batalha/protocol';
 
@@ -9,43 +9,16 @@ describe('validateQuestions - Real Content Suite', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('verifies that real questions export exactly 10 questions', () => {
+  it('verifies that real questions export exactly 15 questions', () => {
     expect(questions).toHaveLength(TOTAL_QUESTIONS);
   });
 
-  it('verifies all 6 mechanics are represented in real questions', () => {
-    const mechanics = new Set<QuestionType>(questions.map(q => q.type));
-    for (const mechanic of REQUIRED_MECHANICS) {
-      expect(mechanics.has(mechanic)).toBe(true);
-    }
-  });
-
-  it('verifies Q8 is an anatomical miology challenge comparing species', () => {
-    const q8 = questions[7];
-    expect(q8.id).toBe('q8');
-    expect(q8.type).toBe('species');
-    expect(q8.prompt).toContain('gluteobíceps');
-    expect(q8.options.some(opt => opt.label.includes('Bovino'))).toBe(true);
-    expect(q8.options.some(opt => opt.label.includes('Equino'))).toBe(true);
-  });
-
-  it('verifies Q9 is boolean with exactly 2 binary choices (Verdadeiro and Falso)', () => {
-    const q9 = questions[8];
-    expect(q9.id).toBe('q9');
-    expect(q9.type).toBe('boolean');
-    expect(q9.options).toHaveLength(2);
-    const labels = q9.options.map(opt => opt.label);
-    expect(labels).toContain('Verdadeiro');
-    expect(labels).toContain('Falso');
-  });
-
-  it('verifies Q10 is the final comparative challenge with 300 base points', () => {
-    const q10 = questions[9];
-    expect(q10.id).toBe('q10');
-    expect(q10.type).toBe('final');
-    expect(q10.order).toBe(9);
-    expect(q10.basePoints).toBe(300);
-    expect(q10.prompt.toLowerCase()).toContain('equino');
+  it('verifies Q23 is the final question with 300 base points', () => {
+    const q23 = questions[14];
+    expect(q23.id).toBe('q23');
+    expect(q23.type).toBe('final');
+    expect(q23.order).toBe(14);
+    expect(q23.basePoints).toBe(300);
   });
 });
 
@@ -93,10 +66,15 @@ describe('validateQuestions - Edge Cases & Rule Enforcement', () => {
     getBaseQuestion('q7', 6, 'region', 100),
     getBaseQuestion('q8', 7, 'species', 100),
     getBaseQuestion('q9', 8, 'boolean', 100),
-    getBaseQuestion('q10', 9, 'final', 300),
+    getBaseQuestion('q10', 9, 'identify', 100),
+    getBaseQuestion('q11', 10, 'identify', 100),
+    getBaseQuestion('q12', 11, 'identify', 100),
+    getBaseQuestion('q13', 12, 'identify', 100),
+    getBaseQuestion('q14', 13, 'identify', 100),
+    getBaseQuestion('q15', 14, 'final', 300),
   ];
 
-  it('passes a fully valid synthetic question set with all 6 mechanics', () => {
+  it('passes a fully valid synthetic question set', () => {
     const list = getValidSyntheticQuestions();
     const errors = validateQuestions(list);
     expect(errors).toHaveLength(0);
@@ -124,16 +102,9 @@ describe('validateQuestions - Edge Cases & Rule Enforcement', () => {
     expect(errors.some(e => e.error.includes('at least 2 options'))).toBe(true);
   });
 
-  it('detects missing required mechanic', () => {
-    const list = getValidSyntheticQuestions();
-    // Replace the boolean question with an identify question
-    list[8] = getBaseQuestion('q9', 8, 'identify', 100);
-    const errors = validateQuestions(list);
-    expect(errors.some(e => e.error.includes("Missing required question mechanic/type: 'boolean'"))).toBe(true);
-  });
-
   it('detects boolean question with 3 options', () => {
     const list = getValidSyntheticQuestions();
+    list[8].type = 'boolean';
     list[8].options = [
       { id: 'opt_1', label: 'Verdadeiro' },
       { id: 'opt_2', label: 'Falso' },
@@ -145,6 +116,7 @@ describe('validateQuestions - Edge Cases & Rule Enforcement', () => {
 
   it('detects boolean question with invalid option labels (e.g. Sim/Nao)', () => {
     const list = getValidSyntheticQuestions();
+    list[8].type = 'boolean';
     list[8].options = [
       { id: 'opt_1', label: 'Sim' },
       { id: 'opt_2', label: 'Não' },
@@ -155,14 +127,14 @@ describe('validateQuestions - Edge Cases & Rule Enforcement', () => {
 
   it('detects final question not being the last question', () => {
     const list = getValidSyntheticQuestions();
-    list[9].type = 'identify';
+    list[14].type = 'identify';
     const errors = validateQuestions(list);
     expect(errors.some(e => e.error.includes('must have type="final"'))).toBe(true);
   });
 
   it('detects final question with basePoints !== 300', () => {
     const list = getValidSyntheticQuestions();
-    list[9].basePoints = 100;
+    list[14].basePoints = 100;
     const errors = validateQuestions(list);
     expect(errors.some(e => e.error.includes('Final question must have basePoints === 300'))).toBe(true);
   });
@@ -171,7 +143,7 @@ describe('validateQuestions - Edge Cases & Rule Enforcement', () => {
     const list = getValidSyntheticQuestions();
     list.pop();
     const errors = validateQuestions(list);
-    expect(errors.some(e => e.error.includes('Expected exactly 10 questions'))).toBe(true);
+    expect(errors.some(e => e.error.includes('Expected exactly 15 questions'))).toBe(true);
   });
 
   it('detects non-sequential orders', () => {

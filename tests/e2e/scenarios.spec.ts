@@ -97,12 +97,12 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     // 3. Host starts game -> Countdown -> Question 1
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(playerPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(playerPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
 
     const screenContext = await browser.newContext();
     const screenPage = await screenContext.newPage();
     await screenPage.goto(`/screen/${pin}`);
-    await expect(screenPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10000 });
+    await expect(screenPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 10000 });
 
     // 4. Host pauses round
     const pauseBtn = hostPage.getByRole('button', { name: /pausar rodada/i });
@@ -127,7 +127,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await resumeBtn.click();
 
     // Countdown triggers, then question returns to active
-    await expect(playerPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10000 });
+    await expect(playerPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 10000 });
 
     await hostContext.close();
     await playerContext.close();
@@ -211,11 +211,11 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     // 3. Start game -> Question 1
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(alicePage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(alicePage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
 
     // 4. Reload BEFORE answering -> question still visible, options can still be clicked
     await alicePage.reload();
-    await expect(alicePage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10000 });
+    await expect(alicePage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 10000 });
     const optA = alicePage.getByRole('button', { name: /alternativa a/i }).first();
     await expect(optA).toBeVisible({ timeout: 5000 });
 
@@ -260,7 +260,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await expect(playerPage).toHaveURL(new RegExp(`/play/${pin}`), { timeout: 10000 });
 
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(playerPage.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(playerPage.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
 
     // 2. Host ends question prematurely
     const endQBtn = hostPage.getByRole('button', { name: /encerrar questão/i });
@@ -392,7 +392,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     // 5. Room B starts and completes one real question through the automatic loop.
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(p2Page.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
+    await expect(p2Page.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12000 });
     await p2Page.getByRole('button', { name: /alternativa a:/i }).click();
     await expect(p2Page.getByText(/resposta registrada|você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
     await expect(p2Page.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 10000 });

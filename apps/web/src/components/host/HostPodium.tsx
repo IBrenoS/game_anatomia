@@ -45,7 +45,7 @@ export default function HostPodium({ podium }: HostPodiumProps) {
     };
   }, [podium.length]);
 
-  if (!podium || podium.length === 0) return <div className="text-white text-center py-12">Aguardando definição do pódio...</div>;
+  if (!podium || podium.length === 0) return <div className="text-[#555E57] text-center py-12">Aguardando definição do pódio...</div>;
 
   const first = podium.find(p => p.position === 1);
   const second = podium.find(p => p.position === 2);
@@ -56,12 +56,12 @@ export default function HostPodium({ podium }: HostPodiumProps) {
   const showFirst = reducedMotion || ceremonyStep >= 3;
 
   return (
-    <div className="flex flex-col h-full text-white items-center justify-center max-w-4xl mx-auto w-full select-none">
-      <div className="text-center mb-8">
-        <span className="text-sm font-bold uppercase tracking-widest text-yellow-300 bg-yellow-950/60 px-4 py-1.5 rounded-full border border-yellow-500/30">
+    <div className="flex flex-col h-full text-[#122017] items-center justify-center max-w-4xl mx-auto w-full select-none p-4 sm:p-6">
+      <div className="text-center mb-6 sm:mb-8">
+        <span className="text-xs font-bold uppercase tracking-widest text-[#B45309] bg-[#FEF9EE] px-3.5 py-1 rounded-full border border-[#F59E0B]/40 shadow-xs">
           Cerimônia Final
         </span>
-        <h2 className="text-3xl md:text-5xl font-black mt-2 text-yellow-400 drop-shadow-md">
+        <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mt-2 text-[#122017] tracking-tight">
           🏆 Pódio dos Campeões
         </h2>
       </div>
@@ -73,34 +73,34 @@ export default function HostPodium({ podium }: HostPodiumProps) {
             {first && showFirst ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.6s_ease-out]' : ''}`}>
                 <div className="text-3xl mb-1">🏆</div>
-                <div className="text-lg md:text-2xl font-black mb-1 text-yellow-300 truncate w-full text-center">{first.nickname}</div>
-                <div className="text-sm md:text-base font-mono font-black mb-2 text-yellow-400 bg-yellow-950/50 px-4 py-1 rounded-full border border-yellow-500/40">{first.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-yellow-400 to-yellow-600 h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-2xl border-t-4 border-yellow-200 ring-2 ring-yellow-400/40">
-                  <span className="text-5xl font-black text-yellow-950">1º</span>
+                <div className="text-base sm:text-xl font-black mb-1 text-[#122017] truncate w-full text-center">{first.nickname}</div>
+                <div className="text-xs sm:text-sm font-mono font-black mb-2 text-[#B45309] bg-[#FEF9EE] px-3.5 py-0.5 rounded-full border border-[#F59E0B]/40 shadow-xs">{first.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-[#FEF9EE] to-[#FDE68A] h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-lg border-t-4 border-[#F59E0B] ring-2 ring-[#F59E0B]/20">
+                  <span className="text-5xl font-black text-[#B45309]">1º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-60 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-60 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>
         </div>
       ) : podium.length === 2 ? (
-        <div className="flex items-end justify-center gap-6 h-80 w-full max-w-xl mx-auto">
+        <div className="flex items-end justify-center gap-4 sm:gap-6 h-80 w-full max-w-xl mx-auto">
           {/* Segundo Lugar (Silver) */}
           <div className="flex flex-col items-center w-1/2 z-10 min-h-[220px] justify-end">
             {second && showSecond ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.5s_ease-out]' : ''}`}>
-                <div className="text-base md:text-lg font-bold mb-1 text-slate-300 truncate w-full text-center">{second.nickname}</div>
-                <div className="text-xs md:text-sm font-mono font-bold mb-2 text-slate-300 bg-black/40 px-3 py-1 rounded-full">{second.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-slate-300 to-slate-500 h-44 rounded-t-2xl flex items-start justify-center pt-3 shadow-lg border-t-4 border-white">
-                  <span className="text-4xl font-black text-slate-800">2º</span>
+                <div className="text-sm sm:text-base font-bold mb-1 text-[#122017] truncate w-full text-center">{second.nickname}</div>
+                <div className="text-xs font-mono font-bold mb-2 text-[#555E57] bg-white border border-[#E2DDD2] px-3 py-0.5 rounded-full shadow-xs">{second.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-white to-[#E2DDD2] h-44 rounded-t-2xl flex items-start justify-center pt-3 shadow-md border-t-4 border-[#94A3B8]">
+                  <span className="text-4xl font-black text-[#475569]">2º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-44 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-44 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>
@@ -110,34 +110,34 @@ export default function HostPodium({ podium }: HostPodiumProps) {
             {first && showFirst ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.6s_ease-out]' : ''}`}>
                 <div className="text-3xl mb-1">🏆</div>
-                <div className="text-lg md:text-2xl font-black mb-1 text-yellow-300 truncate w-full text-center">{first.nickname}</div>
-                <div className="text-sm md:text-base font-mono font-black mb-2 text-yellow-400 bg-yellow-950/50 px-4 py-1 rounded-full border border-yellow-500/40">{first.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-yellow-400 to-yellow-600 h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-2xl border-t-4 border-yellow-200 ring-2 ring-yellow-400/40">
-                  <span className="text-5xl font-black text-yellow-950">1º</span>
+                <div className="text-base sm:text-xl font-black mb-1 text-[#122017] truncate w-full text-center">{first.nickname}</div>
+                <div className="text-xs sm:text-sm font-mono font-black mb-2 text-[#B45309] bg-[#FEF9EE] px-3.5 py-0.5 rounded-full border border-[#F59E0B]/40 shadow-xs">{first.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-[#FEF9EE] to-[#FDE68A] h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-lg border-t-4 border-[#F59E0B] ring-2 ring-[#F59E0B]/20">
+                  <span className="text-5xl font-black text-[#B45309]">1º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-60 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-60 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex items-end justify-center gap-4 h-80 w-full max-w-3xl mx-auto">
+        <div className="flex items-end justify-center gap-3 sm:gap-4 h-80 w-full max-w-3xl mx-auto">
           {/* Segundo Lugar (Silver) */}
           <div className="flex flex-col items-center w-1/3 z-10 min-h-[220px] justify-end">
             {second && showSecond ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.5s_ease-out]' : ''}`}>
-                <div className="text-base md:text-lg font-bold mb-1 text-slate-300 truncate w-full text-center">{second.nickname}</div>
-                <div className="text-xs md:text-sm font-mono font-bold mb-2 text-slate-300 bg-black/40 px-3 py-1 rounded-full">{second.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-slate-300 to-slate-500 h-44 rounded-t-2xl flex items-start justify-center pt-3 shadow-lg border-t-4 border-white">
-                  <span className="text-4xl font-black text-slate-800">2º</span>
+                <div className="text-sm sm:text-base font-bold mb-1 text-[#122017] truncate w-full text-center">{second.nickname}</div>
+                <div className="text-xs font-mono font-bold mb-2 text-[#555E57] bg-white border border-[#E2DDD2] px-3 py-0.5 rounded-full shadow-xs">{second.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-white to-[#E2DDD2] h-44 rounded-t-2xl flex items-start justify-center pt-3 shadow-md border-t-4 border-[#94A3B8]">
+                  <span className="text-3xl sm:text-4xl font-black text-[#475569]">2º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-44 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-44 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>
@@ -147,15 +147,15 @@ export default function HostPodium({ podium }: HostPodiumProps) {
             {first && showFirst ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.6s_ease-out]' : ''}`}>
                 <div className="text-3xl mb-1">🏆</div>
-                <div className="text-lg md:text-2xl font-black mb-1 text-yellow-300 truncate w-full text-center">{first.nickname}</div>
-                <div className="text-sm md:text-base font-mono font-black mb-2 text-yellow-400 bg-yellow-950/50 px-4 py-1 rounded-full border border-yellow-500/40">{first.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-yellow-400 to-yellow-600 h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-2xl border-t-4 border-yellow-200 ring-2 ring-yellow-400/40">
-                  <span className="text-5xl font-black text-yellow-950">1º</span>
+                <div className="text-base sm:text-xl font-black mb-1 text-[#122017] truncate w-full text-center">{first.nickname}</div>
+                <div className="text-xs sm:text-sm font-mono font-black mb-2 text-[#B45309] bg-[#FEF9EE] px-3.5 py-0.5 rounded-full border border-[#F59E0B]/40 shadow-xs">{first.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-[#FEF9EE] to-[#FDE68A] h-60 rounded-t-2xl flex items-start justify-center pt-4 shadow-lg border-t-4 border-[#F59E0B] ring-2 ring-[#F59E0B]/20">
+                  <span className="text-4xl sm:text-5xl font-black text-[#B45309]">1º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-60 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-60 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>
@@ -164,15 +164,15 @@ export default function HostPodium({ podium }: HostPodiumProps) {
           <div className="flex flex-col items-center w-1/3 z-0 min-h-[180px] justify-end">
             {third && showThird ? (
               <div className={`w-full flex flex-col items-center ${!reducedMotion ? 'animate-[fadeIn_0.5s_ease-out]' : ''}`}>
-                <div className="text-sm md:text-base font-bold mb-1 text-amber-500 truncate w-full text-center">{third.nickname}</div>
-                <div className="text-xs font-mono font-bold mb-2 text-amber-400 bg-black/40 px-3 py-1 rounded-full">{third.totalPoints} pts</div>
-                <div className="w-full bg-gradient-to-b from-amber-600 to-amber-800 h-32 rounded-t-2xl flex items-start justify-center pt-3 shadow border-t-4 border-amber-400">
-                  <span className="text-3xl font-black text-amber-950">3º</span>
+                <div className="text-xs sm:text-sm font-bold mb-1 text-[#122017] truncate w-full text-center">{third.nickname}</div>
+                <div className="text-xs font-mono font-bold mb-2 text-[#C95A34] bg-[#FDF6F0] border border-[#D05F36]/30 px-3 py-0.5 rounded-full shadow-xs">{third.totalPoints} pts</div>
+                <div className="w-full bg-gradient-to-b from-[#FDF6F0] to-[#FED7AA] h-32 rounded-t-2xl flex items-start justify-center pt-3 shadow border-t-4 border-[#D05F36]">
+                  <span className="text-2xl sm:text-3xl font-black text-[#9A3412]">3º</span>
                 </div>
               </div>
             ) : (
-              <div className="w-full h-32 rounded-t-2xl bg-black/20 border-t-2 border-white/5 flex items-center justify-center">
-                <span className="text-slate-600 font-bold">...</span>
+              <div className="w-full h-32 rounded-t-2xl bg-white/60 border-t-2 border-[#E2DDD2] flex items-center justify-center">
+                <span className="text-[#94A3B8] font-bold">...</span>
               </div>
             )}
           </div>

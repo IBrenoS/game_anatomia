@@ -742,8 +742,8 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
     });
   });
 
-  describe('P0.5 10th Question Deterministic Transition Sequence', () => {
-    it('progresses through all 10 questions and transitions directly from QUESTION_REVEAL to FINAL_RANKING on Q10', async () => {
+  describe('P0.5 final-question deterministic transition sequence', () => {
+    it('progresses through all questions and transitions directly from QUESTION_REVEAL to FINAL_RANKING on the final question', async () => {
       // Connect host
       const hostReq = createHostRequest();
       await room.fetch(hostReq);
@@ -761,8 +761,8 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await hostClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 1));
       await runNextAlarm(); // starts Question 0 (Q1)
 
-      // Play questions 0 through 8 (Q1 to Q9)
-      for (let qIndex = 0; qIndex < 9; qIndex++) {
+      // Play every question preceding the final question.
+      for (let qIndex = 0; qIndex < TOTAL_QUESTIONS - 1; qIndex++) {
         const q = questions[qIndex];
         // Player answers (which automatically ends question because all answered!)
         await pClient.send(createClientEnvelope('SUBMIT_ANSWER', {
@@ -777,18 +777,17 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         await runNextAlarm(); // Countdown alarm -> starts next question
       }
 
-      // Now at Question index 9 (the 10th and final question!)
-      const q10 = questions[9];
-      expect(q10.type).toBe('final');
+      const finalQuestion = questions[TOTAL_QUESTIONS - 1];
+      expect(finalQuestion.type).toBe('final');
 
-      // Player answers 10th question (which triggers auto-end and QUESTION_REVEAL)
+      // Player answers the final question (which triggers auto-end and QUESTION_REVEAL)
       await pClient.send(createClientEnvelope('SUBMIT_ANSWER', {
-        questionId: q10.id,
-        questionVersion: 9,
-        optionId: q10.correctOptionId,
+        questionId: finalQuestion.id,
+        questionVersion: TOTAL_QUESTIONS - 1,
+        optionId: finalQuestion.correctOptionId,
       }, 0));
 
-      // On Question 10, the automatic reveal transition goes directly to FINAL_RANKING.
+      // On the final question, the automatic reveal transition goes directly to FINAL_RANKING.
       hostClient.clearMessages();
       await runNextAlarm();
 
@@ -1221,7 +1220,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       expect(hostError?.payload?.code).toBe(ProtocolError.INVALID_PAYLOAD);
     });
 
-    it('T12: 1 player plays all 10 questions to podium and finished automatically', async () => {
+    it('T12: 1 player plays all questions to podium and finished automatically', async () => {
       const hostReq = createHostRequest();
       await room.fetch(hostReq);
       const hostWs = ctx.getWebSockets('role:host')[0];
@@ -1236,8 +1235,8 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await hostTestClient.send(createClientEnvelope('HOST_COMMAND', { command: 'START_GAME', expectedRoomVersion: (room as any).room.roomVersion }, 0));
       await runNextAlarm(); // start Q1
 
-      // Play questions 0 through 8 (Q1 to Q9)
-      for (let i = 0; i < 9; i++) {
+      // Play every question preceding the final question.
+      for (let i = 0; i < TOTAL_QUESTIONS - 1; i++) {
         expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
         expect((room as any).room.currentQuestionIndex).toBe(i);
         await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
@@ -1253,13 +1252,14 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         await runNextAlarm(); // -> next QUESTION_ACTIVE
       }
 
-      // Q10
-      expect((room as any).room.currentQuestionIndex).toBe(9);
+      const finalQuestionIndex = TOTAL_QUESTIONS - 1;
+      const finalQuestion = questions[finalQuestionIndex];
+      expect((room as any).room.currentQuestionIndex).toBe(finalQuestionIndex);
       expect((room as any).room.status).toBe(GameState.QUESTION_ACTIVE);
       await p1.send(createClientEnvelope('SUBMIT_ANSWER', {
-        questionId: questions[9].id,
-        questionVersion: 9,
-        optionId: questions[9].correctOptionId,
+        questionId: finalQuestion.id,
+        questionVersion: finalQuestionIndex,
+        optionId: finalQuestion.correctOptionId,
       }, 0));
       expect((room as any).room.status).toBe(GameState.QUESTION_REVEAL);
 
@@ -1780,7 +1780,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       const revealSnap = pClient.getAllMessages().find(m => m.type === ServerEventType.SNAPSHOT);
       expect(revealSnap).toBeDefined();
       expect(revealSnap.payload.correctOptionId).toBe(q1.correctOptionId);
-      expect(revealSnap.payload.explanation).toBe(q1.explanation);
+      expect(revealSnap.payload.explanation).toBe(q1.explanation ?? null);
       expect(revealSnap.payload.distribution.length).toBeGreaterThan(0);
     });
 
@@ -1921,7 +1921,7 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
       await runNextAlarm();
       await runNextAlarm();
 
-      for (let questionIndex = 1; questionIndex < 9; questionIndex++) {
+      for (let questionIndex = 1; questionIndex < TOTAL_QUESTIONS - 1; questionIndex++) {
         const question = questions[questionIndex];
         await resumed.send(createClientEnvelope('SUBMIT_ANSWER', {
           questionId: question.id,
@@ -1933,10 +1933,10 @@ describe('Worker & Durable Object Integration Suite (P3.2)', () => {
         await runNextAlarm();
       }
 
-      const finalQuestion = questions[9];
+      const finalQuestion = questions[TOTAL_QUESTIONS - 1];
       await resumed.send(createClientEnvelope('SUBMIT_ANSWER', {
         questionId: finalQuestion.id,
-        questionVersion: 9,
+        questionVersion: TOTAL_QUESTIONS - 1,
         optionId: finalQuestion.correctOptionId,
       }, 0));
       await runNextAlarm();

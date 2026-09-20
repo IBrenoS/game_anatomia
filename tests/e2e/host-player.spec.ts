@@ -51,8 +51,8 @@ test.describe('Host + Player', () => {
     await expect(screen.getByText('Aluno')).toBeVisible();
     await expect(host.getByText('Apresentador', { exact: true })).toHaveCount(0);
     await host.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(player.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12_000 });
-    await expect(screen.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12_000 });
+    await expect(player.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12_000 });
+    await expect(screen.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12_000 });
   });
 
   test('T2/T3/T11: host player cria uma identidade e joga sem Screen', async ({ page }) => {
@@ -73,7 +73,7 @@ test.describe('Host + Player', () => {
     await joinPlayer(other, pin, 'Outro');
 
     await host.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(host.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12_000 });
+    await expect(host.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12_000 });
     await expect(host.getByText(/voto|distribuição|resposta correta/i)).toHaveCount(0);
     await host.getByRole('button', { name: /alternativa a/i }).click();
     await expect(host.getByText(/resposta registrada/i)).toBeVisible();
@@ -81,7 +81,7 @@ test.describe('Host + Player', () => {
     await host.getByRole('button', { name: /pausar rodada/i }).click();
     await expect(host.getByRole('button', { name: /retomar rodada/i })).toBeVisible();
     await host.getByRole('button', { name: /retomar rodada/i }).click();
-    await expect(host.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 10_000 });
+    await expect(host.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 10_000 });
     await host.getByRole('button', { name: /encerrar questão/i }).click();
     await host.getByRole('button', { name: /sim, encerrar/i }).click();
     await expect(host.getByText(/você acertou|resposta incorreta/i)).toBeVisible();
@@ -97,8 +97,8 @@ test.describe('Host + Player', () => {
     await joinPlayer(other, pin, 'Outro');
     await host.getByRole('button', { name: /iniciar partida/i }).first().click();
 
-    for (let question = 1; question <= 10; question++) {
-      const progress = new RegExp(`questão ${question} de 10`, 'i');
+    for (let question = 1; question <= 15; question++) {
+      const progress = new RegExp(`questão ${question} de 15`, 'i');
       await expect(host.getByText(progress)).toBeVisible({ timeout: 15_000 });
       await expect(other.getByText(progress)).toBeVisible({ timeout: 15_000 });
       await host.getByRole('button', { name: /alternativa a/i }).click();
@@ -118,7 +118,7 @@ test.describe('Host + Player', () => {
     const other = await otherContext.newPage();
     await joinPlayer(other, pin, 'Outro');
     await host.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(host.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12_000 });
+    await expect(host.getByText(/questão 1 de 15/i)).toBeVisible({ timeout: 12_000 });
     await host.getByRole('button', { name: /alternativa a/i }).click();
     await other.getByRole('button', { name: /alternativa b/i }).click();
     await expect(host.getByText(/pontuação acumulada/i)).toBeVisible({ timeout: 8_000 });

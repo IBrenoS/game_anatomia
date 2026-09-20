@@ -293,7 +293,7 @@ describe('Pacote Corretivo V3.2 — Gate Mecânico de Presença e Reconexão', (
 
     // Mesmo socket envia SUBMIT_ANSWER válido ainda dentro do deadline da pergunta
     const answerTime = expiryTime + 2_000;
-    expect(answerTime).toBeLessThan(questionStartedAt + 60_000);
+    expect(answerTime).toBeLessThan(questionStartedAt + question.durationMs);
     vi.setSystemTime(answerTime);
 
     player.clear();
@@ -420,6 +420,7 @@ describe('Pacote Corretivo V3.2 — Gate Mecânico de Presença e Reconexão', (
     const playerA = await connect('player', 'Alice');
     const playerB = await connect('player', 'Bob');
     const questionStartedAt = await startQuestion(host);
+    const question = questions[0];
 
     const pAId = playerA.messages().find(m => m.type === ServerEventType.SESSION_ACCEPTED).payload.playerId;
     const pBId = playerB.messages().find(m => m.type === ServerEventType.SESSION_ACCEPTED).payload.playerId;
@@ -440,7 +441,7 @@ describe('Pacote Corretivo V3.2 — Gate Mecânico de Presença e Reconexão', (
     // Capturar remainingMs
     const pausedRound = (room as any).getCurrentRound();
     const originalRemainingMs = pausedRound.remainingMs;
-    expect(originalRemainingMs).toBe(50_000);
+    expect(originalRemainingMs).toBe(question.durationMs - 10_000);
 
     // Assert que alarme de presença foi agendado em PAUSED
     const pausedAlarm = ctx.getAlarm();
