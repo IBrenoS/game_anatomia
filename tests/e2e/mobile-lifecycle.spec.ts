@@ -81,7 +81,8 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -205,7 +206,8 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -309,7 +311,8 @@ test.describe('T5 — Mobile Background/Foreground Lifecycle Suite', () => {
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 

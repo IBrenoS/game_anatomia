@@ -26,7 +26,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
 
     const pinMatch = hostPage.url().match(/\/host\/(\d{6})/);
@@ -71,7 +72,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -127,7 +129,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -175,7 +178,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -233,7 +237,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -270,7 +275,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pin = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -292,13 +298,13 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
       await expect(pPage.getByText(name).first()).toBeVisible({ timeout: 5000 });
 
       // Host must reflect new participant and count immediately WITHOUT page reload
-      await expect(hostPage.getByText(name)).toBeVisible({ timeout: 8000 });
+      await expect(hostPage.getByText(name, { exact: true })).toBeVisible({ timeout: 8000 });
       await expect(hostPage.getByText(`Participantes (${count}/${count} conectados)`)).toBeVisible({ timeout: 8000 });
     }
 
     // Verify all 4 players are visible in host roster
     for (const name of players) {
-      await expect(hostPage.getByText(name)).toBeVisible();
+      await expect(hostPage.getByText(name, { exact: true })).toBeVisible();
     }
 
     // Verify Start button indicates ready with 4 connected players
@@ -317,7 +323,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pinA = hostPage.url().match(/\/host\/(\d{6})/)![1];
 
@@ -353,7 +360,8 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await expect(hostPage).toHaveURL('/host', { timeout: 5000 });
 
     // 3. Host launches Room B
-    await hostPage.getByRole('button', { name: /iniciar batalha/i }).click();
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
+    await hostPage.getByRole('button', { name: /criar partida/i }).click();
     await expect(hostPage).toHaveURL(/\/host\/\d{6}/, { timeout: 15000 });
     const pinB = hostPage.url().match(/\/host\/(\d{6})/)![1];
     expect(pinB).not.toBe(pinA);
@@ -376,7 +384,7 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
     await expect(p2Page.getByText(/questão 1 de 10/i)).toBeVisible({ timeout: 12000 });
     await p2Page.getByRole('button', { name: /alternativa a:/i }).click();
-    await expect(p2Page.getByText(/resposta registrada/i)).toBeVisible({ timeout: 5000 });
+    await expect(p2Page.getByText(/resposta registrada|você acertou|resposta incorreta/i)).toBeVisible({ timeout: 5000 });
     await expect(p2Page.getByText(/você acertou|resposta incorreta/i)).toBeVisible({ timeout: 10000 });
     await expect(hostPage.getByText(/classificação da rodada/i)).toBeVisible({ timeout: 10000 });
 

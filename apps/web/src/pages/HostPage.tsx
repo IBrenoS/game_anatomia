@@ -58,7 +58,6 @@ export function HostPage() {
   const rankings = useGameStore((s) => s.rankings);
   const isFinalRanking = useGameStore((s) => s.isFinalRanking);
   const podium = useGameStore((s) => s.podium);
-  const totalPlayers = useGameStore((s) => s.totalPlayers);
   const connectedPlayers = useGameStore((s) => s.connectedPlayers);
   const personalRanking = rankings.find(ranking => ranking.playerId === playerId);
 
@@ -94,14 +93,44 @@ export function HostPage() {
     : hostSocket.connectionState;
 
   if (primaryConnectionState === 'disconnected' || primaryConnectionState === 'connecting') {
-    return <div className="min-h-screen bg-[#1e3a5f] text-white flex items-center justify-center">Conectando à sala...</div>;
+    return (
+      <div className="min-h-screen bg-[#080C11] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-[#1FD4A7] border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-bold text-slate-300">Conectando à sala...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // During LOBBY, render the dedicated redesigned Tela 5 layout without technical operational headers
+  if (roomState === 'LOBBY') {
+    return (
+      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col p-4 sm:p-6 md:p-10 relative overflow-hidden">
+        <div 
+          className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#123829]/20 blur-3xl pointer-events-none" 
+          aria-hidden="true" 
+        />
+        <div 
+          className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#D05F36]/10 blur-3xl pointer-events-none" 
+          aria-hidden="true" 
+        />
+        <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} />
+        {restorationError && (
+          <div role="alert" className="mb-4 rounded-xl border border-amber-400/50 bg-amber-950/80 p-3 text-center font-bold text-amber-100 text-xs sm:text-sm">
+            {restorationError}
+          </div>
+        )}
+        <HostLobby players={players} presences={presences} pin={pin} />
+      </div>
+    );
   }
 
   const renderPresenterFinished = () => (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-6">
       <span className="text-6xl">🏁</span>
       <h2 className="text-4xl font-black text-white">Partida Encerrada</h2>
-      <p className="text-blue-200 text-lg max-w-md">
+      <p className="text-slate-300 text-lg max-w-md">
         A batalha foi concluída com sucesso. Você pode iniciar uma nova partida ou voltar ao início.
       </p>
       <div className="flex gap-4">
@@ -112,7 +141,7 @@ export function HostPage() {
             useGameStore.getState().resetStore();
             navigate('/host');
           }}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl shadow transition-all cursor-pointer"
+          className="px-6 py-3 bg-[#1FD4A7] hover:bg-[#19C298] font-bold text-[#080C11] rounded-xl shadow transition-all cursor-pointer"
         >
           Nova Partida
         </button>
@@ -132,10 +161,6 @@ export function HostPage() {
   );
 
   const renderContent = () => {
-    if (roomState === 'LOBBY') {
-      return <HostLobby players={players} presences={presences} pin={pin} />;
-    }
-
     if (competitiveView) {
       switch (roomState) {
         case 'COUNTDOWN':
@@ -165,18 +190,32 @@ export function HostPage() {
         case 'FINISHED':
           return <PlayerFinished ranking={personalRanking} />;
         default:
-          return <div className="flex-1 flex items-center justify-center text-white">Aguardando estado do jogo...</div>;
+          return <div className="flex-1 flex items-center justify-center text-white">Aguarde...</div>;
       }
     }
 
     switch (roomState) {
       case 'COUNTDOWN':
         return <CountdownDisplay mode="host" />;
-      case 'QUESTION_ACTIVE':
       case 'PAUSED':
-        return <HostQuestion question={currentQuestion} currentQuestionIndex={currentQuestionIndex} startedAt={startedAt} deadlineAt={deadlineAt} />;
+      case 'QUESTION_ACTIVE':
+        return (
+          <HostQuestion
+            question={currentQuestion}
+            currentQuestionIndex={currentQuestionIndex}
+            startedAt={startedAt}
+            deadlineAt={deadlineAt}
+          />
+        );
       case 'QUESTION_REVEAL':
-        return <HostReveal question={currentQuestion} distribution={distribution} correctOptionId={correctOptionId} explanation={explanation} />;
+        return (
+          <HostReveal
+            question={currentQuestion}
+            correctOptionId={correctOptionId}
+            explanation={explanation}
+            distribution={distribution}
+          />
+        );
       case 'ROUND_RANKING':
       case 'FINAL_RANKING':
         return <HostRanking rankings={rankings} isFinal={isFinalRanking} />;
@@ -190,43 +229,42 @@ export function HostPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1e3a5f] flex flex-col">
+    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col">
       <ReconnectOverlay isReconnecting={competitiveView && playerSocket.connectionState === 'reconnecting'} />
-      <header className="p-4 bg-black/20 flex justify-between items-center text-white border-b border-white/10">
+      <header className="p-4 bg-[#0E1522] flex justify-between items-center text-white border-b border-white/10">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold">
-            {competitiveView ? `Host + Player${nickname ? ` — ${nickname}` : ''}` : 'Apresentador'} — Sala PIN: {pin}
+          <h1 className="text-base sm:text-lg font-bold">
+            {competitiveView ? `Host + Player — ${nickname || 'Jogador'}` : 'Apresentador'} — Sala PIN: {pin}
           </h1>
           {pin && (
             <a
               href={`/screen/${pin}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-blue-400/30"
-              title="Abrir Telão da Arena em nova aba"
+              className="px-3 py-1 bg-[#151F2E] hover:bg-[#1C293D] text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer border border-white/15"
             >
-              <span>📺</span>
-              <span>Abrir Telão</span>
+              <span>Abrir telão</span>
+              <span className="text-[10px] text-slate-400">↗</span>
             </a>
           )}
         </div>
-        <div className="flex items-center gap-2 text-sm text-blue-200">
-          <span className={`w-2.5 h-2.5 rounded-full ${connectedPlayers > 0 ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
-          <span><strong className="text-white font-bold">{totalPlayers}</strong> participantes • <strong className="text-white font-bold">{connectedPlayers}</strong> conectados</span>
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
+          <span className={`w-2 h-2 rounded-full ${connectedPlayers > 0 ? 'bg-[#1FD4A7] animate-pulse' : 'bg-slate-500'}`} />
+          <span><strong className="text-white font-bold">{players.length}</strong> participantes • <strong className="text-white font-bold">{connectedPlayers}</strong> conectados</span>
         </div>
       </header>
 
       {restorationError && (
-        <div role="alert" className="m-4 rounded-xl border border-amber-400/50 bg-amber-950/80 p-3 text-center font-bold text-amber-100">
+        <div role="alert" className="m-4 rounded-xl border border-amber-400/50 bg-amber-950/80 p-3 text-center font-bold text-amber-100 text-xs sm:text-sm">
           {restorationError}
         </div>
       )}
 
-      <main className="flex-1 flex flex-col p-6">
+      <main className="flex-1 flex flex-col p-4 sm:p-6">
         {renderContent()}
       </main>
 
-      <footer className="p-4 bg-black/20 border-t border-white/10">
+      <footer className="p-4 bg-[#0E1522] border-t border-white/10">
         <HostControls roomState={roomState} adminConnectionState={hostSocket.connectionState} />
       </footer>
     </div>

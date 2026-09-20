@@ -11,38 +11,40 @@ interface ConfirmDialogProps {
   isDestructive?: boolean;
 }
 
-export default function ConfirmDialog({
+export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText = 'Confirmar',
+  cancelText = 'Cancelar',
   onConfirm,
   onCancel,
-  isDestructive = false
-}: ConfirmDialogProps) {
+  isDestructive = false,
+}) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-[#1e3a5f] rounded-xl shadow-2xl border border-white/10 w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-[fadeInScale_0.2s_ease-out]">
+      <div className="bg-[#0E1522] rounded-2xl shadow-2xl border border-white/15 w-full max-w-md overflow-hidden select-none">
         <div className="p-6">
-          <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
-          <p className="text-blue-200">{message}</p>
+          <h3 className="text-lg sm:text-xl font-black text-white mb-2">{title}</h3>
+          <p className="text-sm text-slate-300 leading-relaxed">{message}</p>
         </div>
-        <div className="bg-black/20 px-6 py-4 flex justify-end gap-3">
+        <div className="bg-black/30 px-6 py-4 flex justify-end gap-3 border-t border-white/10">
           <button
+            type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded font-medium text-white hover:bg-white/10 transition-colors"
+            className="px-4 py-2 rounded-xl font-bold text-xs sm:text-sm text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded font-bold text-white transition-colors ${
-              isDestructive 
-                ? 'bg-red-600 hover:bg-red-700' 
-                : 'bg-blue-600 hover:bg-blue-700'
+            className={`px-4 py-2 rounded-xl font-bold text-xs sm:text-sm text-white transition-all cursor-pointer shadow-md active:scale-95 ${
+              isDestructive
+                ? 'bg-rose-600 hover:bg-rose-700'
+                : 'bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11]'
             }`}
           >
             {confirmText}
@@ -51,4 +53,6 @@ export default function ConfirmDialog({
       </div>
     </div>
   );
-}
+};
+
+export default ConfirmDialog;

@@ -27,8 +27,9 @@ test.describe('Batalha Anatômica — Complete Automated 10-Question E2E Suite',
     const hostContext = await browser.newContext();
     const hostPage = await hostContext.newPage();
     await hostPage.goto('/host');
+    await hostPage.getByRole('button', { name: /só vou apresentar/i }).click();
 
-    const startBattleBtn = hostPage.getByRole('button', { name: /iniciar batalha/i });
+    const startBattleBtn = hostPage.getByRole('button', { name: /criar partida/i });
     await expect(startBattleBtn).toBeVisible({ timeout: 15000 });
     await startBattleBtn.click();
 

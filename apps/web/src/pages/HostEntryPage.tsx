@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router';
+import { useNavigate } from 'react-router';
 import { createRoom } from '../lib/api.js';
 import { useGameStore } from '../stores/gameStore.js';
 import {
@@ -9,33 +9,40 @@ import {
   type HostParticipationMode,
 } from '../lib/hostParticipation.js';
 import { getWebSocketManager } from '../lib/ws.js';
+import BrandHeader from '../components/shared/BrandHeader.js';
 
 export const HostEntryPage: React.FC = () => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<HostParticipationMode | null>(null);
+  const [mode, setMode] = useState<HostParticipationMode | null>('player');
   const [nickname, setNickname] = useState('');
-  const [creationStatus, setCreationStatus] = useState<'selecting' | 'creating-room' | 'joining-player' | 'error'>('selecting');
+  const [creationStatus, setCreationStatus] = useState<
+    'idle' | 'creating-room' | 'joining-player' | 'error'
+  >('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createdRoom, setCreatedRoom] = useState<{ pin: string; joinUrl: string } | null>(null);
 
-  const handleStartBattle = async () => {
+  const handleStartBattle = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (creationStatus === 'creating-room' || creationStatus === 'joining-player') return;
+
     if (!mode) {
       setErrorMessage('Escolha como você vai participar.');
       return;
     }
 
     const normalizedNickname = nickname.trim().replace(/\s+/g, ' ');
-    if (mode === 'player' && (normalizedNickname.length < 2 || normalizedNickname.length > 20)) {
-      setErrorMessage('O apelido deve ter entre 2 e 20 caracteres.');
-      return;
+    if (mode === 'player') {
+      if (normalizedNickname.length < 2 || normalizedNickname.length > 20) {
+        setErrorMessage('O apelido deve ter entre 2 e 20 caracteres.');
+        return;
+      }
     }
 
     setErrorMessage(null);
 
     try {
       setCreationStatus(createdRoom ? 'joining-player' : 'creating-room');
-      const room = createdRoom ?? await createRoom();
+      const room = createdRoom ?? (await createRoom());
       if (!createdRoom) setCreatedRoom(room);
 
       useGameStore.getState().setHostData(room);
@@ -56,185 +63,190 @@ export const HostEntryPage: React.FC = () => {
           ? err.message
           : err instanceof Error && err.message
           ? err.message
-          : 'Não foi possível conectar ao servidor para criar a arena. Verifique sua conexão e tente novamente.'
+          : 'Não foi possível conectar ao servidor para criar a sala. Verifique sua conexão e tente novamente.',
       );
     }
   };
 
+  const isSubmitting = creationStatus === 'creating-room' || creationStatus === 'joining-player';
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1e3a5f] via-[#152a45] to-[#0f1d30] text-white flex flex-col justify-between p-4 md:p-8">
-      {/* Header */}
-      <header className="w-full max-w-4xl mx-auto flex justify-between items-center py-4 border-b border-white/10">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl" role="img" aria-label="Anatomia">🦴</span>
-          <div>
-            <span className="text-xs uppercase tracking-widest text-blue-300 font-bold block">
-              Ambiente do Apresentador
-            </span>
-            <span className="text-lg font-black tracking-tight text-white">
-              Batalha Anatômica
-            </span>
-          </div>
-        </div>
-        <Link
-          to="/"
-          className="text-xs sm:text-sm font-semibold text-blue-200 hover:text-white transition-colors bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-lg"
-        >
-          Modo Participante
-        </Link>
-      </header>
+    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col justify-between p-4 sm:p-6 md:p-10 relative overflow-hidden">
+      {/* Ambient background lighting */}
+      <div 
+        className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[#123829]/20 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
+      <div 
+        className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-[#D05F36]/10 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
 
-      {/* Main Content */}
-      <main className="w-full max-w-4xl mx-auto my-auto py-8 flex flex-col items-center">
-        {/* Arena Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/30 text-blue-300 text-xs sm:text-sm font-bold uppercase tracking-wider mb-6">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Arena Pronta para Transmissão
-        </div>
+      <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col justify-between z-10">
+        {/* Brand Header */}
+        <BrandHeader />
 
-        {/* Confrontation Title */}
-        <div className="text-center space-y-4 max-w-2xl mb-10">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-white drop-shadow-lg">
-            Bovino <span className="text-yellow-400 text-3xl sm:text-4xl md:text-5xl">×</span> Equino
-          </h1>
-          <p className="text-lg sm:text-xl text-blue-200 font-medium leading-relaxed">
-            Duelo anatomofisiológico comparado: músculos dorsais, ventrais e aplicações veterinárias funcionais.
-          </p>
-        </div>
-
-        {/* Battle Attributes Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-10">
-          <div className="bg-[#152a45]/80 backdrop-blur-sm border border-blue-900/50 rounded-2xl p-4 text-center shadow-lg hover:border-blue-700/50 transition-all">
-            <div className="text-2xl sm:text-3xl mb-1">🎯</div>
-            <div className="text-xl sm:text-2xl font-black text-white">10</div>
-            <div className="text-xs sm:text-sm text-blue-300 font-medium">Questões Técnicas</div>
-          </div>
-
-          <div className="bg-[#152a45]/80 backdrop-blur-sm border border-blue-900/50 rounded-2xl p-4 text-center shadow-lg hover:border-blue-700/50 transition-all">
-            <div className="text-2xl sm:text-3xl mb-1">👥</div>
-            <div className="text-xl sm:text-2xl font-black text-white">Até 50</div>
-            <div className="text-xs sm:text-sm text-blue-300 font-medium">Competidores</div>
-          </div>
-
-          <div className="bg-[#152a45]/80 backdrop-blur-sm border border-blue-900/50 rounded-2xl p-4 text-center shadow-lg hover:border-blue-700/50 transition-all">
-            <div className="text-2xl sm:text-3xl mb-1">⏱</div>
-            <div className="text-xl sm:text-2xl font-black text-white">10–15</div>
-            <div className="text-xs sm:text-sm text-blue-300 font-medium">Minutos de Partida</div>
-          </div>
-
-          <div className="bg-[#152a45]/80 backdrop-blur-sm border border-blue-900/50 rounded-2xl p-4 text-center shadow-lg hover:border-blue-700/50 transition-all">
-            <div className="text-2xl sm:text-3xl mb-1">⚡</div>
-            <div className="text-xl sm:text-2xl font-black text-yellow-300">Tempo Real</div>
-            <div className="text-xs sm:text-sm text-blue-300 font-medium">Precisão & Velocidade</div>
-          </div>
-        </div>
-
-        {/* Action Panel */}
-        <div className="w-full max-w-md bg-[#152a45] p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-800/40 flex flex-col items-center space-y-6">
-          <div className="text-center space-y-1">
-            <h2 className="text-xl font-bold text-white">Lançar Nova Partida</h2>
-            <p className="text-sm text-blue-300">
-              Gera a sala, o PIN de 6 dígitos e o QR Code oficial para a turma.
+        {/* Main Creation Flow (Tela 4) */}
+        <main className="w-full max-w-2xl mx-auto my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
+          <div className="space-y-2 mb-8 text-left">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
+              Criar nova batalha
+            </h1>
+            <p className="text-sm sm:text-base text-slate-400">
+              Como você vai participar?
             </p>
           </div>
 
-          {errorMessage && (
-            <div 
-              role="alert" 
-              className="w-full p-4 bg-red-950/70 border border-red-500/50 rounded-xl text-red-200 text-sm text-center"
-            >
-              {errorMessage}
-            </div>
-          )}
-
-          <fieldset className="w-full space-y-3">
-            <legend className="text-base font-bold text-white mb-3 text-center">
-              Como você vai participar?
-            </legend>
-            <button
-              type="button"
-              onClick={() => { setMode('player'); setErrorMessage(null); }}
-              aria-pressed={mode === 'player'}
-              className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                mode === 'player'
-                  ? 'border-emerald-400 bg-emerald-500/20 ring-2 ring-emerald-400/30'
-                  : 'border-white/15 bg-white/5 hover:bg-white/10'
-              }`}
-            >
-              <span className="block font-black text-white">Também vou jogar</span>
-              <span className="block text-sm text-blue-200 mt-1">Você cria a sala e participa da batalha.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('presenter'); setErrorMessage(null); }}
-              aria-pressed={mode === 'presenter'}
-              className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                mode === 'presenter'
-                  ? 'border-blue-400 bg-blue-500/20 ring-2 ring-blue-400/30'
-                  : 'border-white/15 bg-white/5 hover:bg-white/10'
-              }`}
-            >
-              <span className="block font-black text-white">Só vou apresentar</span>
-              <span className="block text-sm text-blue-200 mt-1">Você controla a partida sem participar.</span>
-            </button>
-          </fieldset>
-
-          {mode === 'player' && (
-            <div className="w-full space-y-2">
-              <label htmlFor="host-player-nickname" className="block text-sm font-bold text-blue-100">
-                Nome ou apelido
-              </label>
-              <input
-                id="host-player-nickname"
-                type="text"
-                value={nickname}
-                onChange={(event) => { setNickname(event.target.value); setErrorMessage(null); }}
-                minLength={2}
-                maxLength={20}
-                autoComplete="off"
-                className="w-full rounded-xl bg-white p-3 text-lg font-bold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-400/50"
-                placeholder="Ex: Breno"
-              />
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleStartBattle}
-            disabled={creationStatus === 'creating-room' || creationStatus === 'joining-player'}
-            className="w-full min-h-[56px] py-4 px-6 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:from-slate-700 disabled:to-slate-800 disabled:opacity-75 text-white text-xl font-black rounded-2xl shadow-xl shadow-green-950/40 transition-all active:scale-95 cursor-pointer disabled:cursor-wait flex items-center justify-center gap-3"
-          >
-            {creationStatus === 'creating-room' || creationStatus === 'joining-player' ? (
-              <>
-                <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin motion-reduce:animate-none" />
-                <span>{creationStatus === 'joining-player' ? 'Entrando na arena...' : 'Preparando a arena...'}</span>
-              </>
-            ) : (
-              <>
-                <span>▶</span>
-                <span>{createdRoom ? 'Tentar entrar novamente' : 'Criar partida'}</span>
-              </>
+          <form onSubmit={handleStartBattle} className="space-y-6">
+            {errorMessage && (
+              <div 
+                role="alert" 
+                className="w-full p-4 bg-rose-950/50 border border-rose-500/40 rounded-xl text-rose-200 text-xs sm:text-sm"
+              >
+                {errorMessage}
+              </div>
             )}
-          </button>
 
-          <p className="text-xs text-blue-400/80 text-center">
-            Ao iniciar, você terá acesso ao painel de controle e ao link do telão para projeção.
-          </p>
-        </div>
-      </main>
+            {/* Participation Mode Selection Blocks */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Option 1: Também vou jogar */}
+              <button
+                type="button"
+                aria-pressed={mode === 'player'}
+                onClick={() => {
+                  setMode('player');
+                  setErrorMessage(null);
+                }}
+                className={`w-full p-5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] ${
+                  mode === 'player'
+                    ? 'border-[#1FD4A7] bg-[#123829]/40 ring-1 ring-[#1FD4A7]/50 shadow-[0_0_20px_rgba(31,212,167,0.15)]'
+                    : 'border-white/10 bg-[#0E1522] hover:bg-[#151F2E] hover:border-white/20'
+                }`}
+              >
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Também vou jogar
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                    Você cria e compete.
+                  </p>
+                </div>
 
-      {/* Footer */}
-      <footer className="w-full max-w-4xl mx-auto py-4 text-center border-t border-white/10 text-xs text-blue-400">
-        <p>
-          Batalha Anatômica — Bovino × Equino • Modo Apresentador
-        </p>
-        <p className="mt-1">
-          Quer jogar como participante?{' '}
-          <Link to="/" className="text-blue-300 hover:text-white underline font-medium">
-            Entrar com PIN
-          </Link>
-        </p>
-      </footer>
+                {mode === 'player' && (
+                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded">
+                    SELECIONADO
+                  </span>
+                )}
+              </button>
+
+              {/* Option 2: Só vou apresentar */}
+              <button
+                type="button"
+                aria-pressed={mode === 'presenter'}
+                onClick={() => {
+                  setMode('presenter');
+                  setErrorMessage(null);
+                }}
+                className={`w-full p-5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] ${
+                  mode === 'presenter'
+                    ? 'border-[#1FD4A7] bg-[#123829]/40 ring-1 ring-[#1FD4A7]/50 shadow-[0_0_20px_rgba(31,212,167,0.15)]'
+                    : 'border-white/10 bg-[#0E1522] hover:bg-[#151F2E] hover:border-white/20'
+                }`}
+              >
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Só vou apresentar
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                    Você controla sem competir.
+                  </p>
+                </div>
+
+                {mode === 'presenter' && (
+                  <span className="self-start mt-3 text-[10px] font-black uppercase tracking-wider text-[#1FD4A7] bg-[#1FD4A7]/15 px-2.5 py-0.5 rounded">
+                    SELECIONADO
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Name input (only when "Também vou jogar" is active) */}
+            {mode === 'player' && (
+              <div className="space-y-2 pt-2 animate-[fadeInScale_0.2s_ease-out]">
+                <label 
+                  htmlFor="host-nickname" 
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-300"
+                >
+                  Seu nome
+                </label>
+
+                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all">
+                  <input
+                    id="host-nickname"
+                    type="text"
+                    value={nickname}
+                    onChange={(e) => {
+                      setNickname(e.target.value);
+                      setErrorMessage(null);
+                    }}
+                    minLength={2}
+                    maxLength={20}
+                    autoComplete="nickname"
+                    placeholder="Ex.: Breno"
+                    required
+                    className="w-full bg-transparent text-[#080C11] font-bold text-base sm:text-lg outline-none placeholder:text-slate-400"
+                  />
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  Seu nome aparecerá no ranking e no pódio.
+                </p>
+              </div>
+            )}
+
+            {/* Action CTA Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                aria-label={mode === 'player' ? 'Criar partida — Criar minha partida' : 'Criar partida'}
+                disabled={isSubmitting || !mode || (mode === 'player' && nickname.trim().length < 2)}
+                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-[#080C11] border-t-transparent rounded-full animate-spin" />
+                    <span>
+                      {creationStatus === 'joining-player' ? 'Entrando na sala...' : 'Criando a sala...'}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>{mode === 'player' ? 'Criar minha partida' : 'Criar partida'}</span>
+                    <span>→</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Back Navigation */}
+          <div className="mt-12 pt-6 border-t border-white/10">
+            <button
+              type="button"
+              onClick={() => navigate('/?step=choice')}
+              className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>←</span>
+              <span>Voltar</span>
+            </button>
+          </div>
+        </main>
+
+        {/* Footer info */}
+        <footer className="w-full py-4 text-center text-xs text-slate-500">
+          <span>Batalha Anatômica • Painel do Organizador</span>
+        </footer>
+      </div>
     </div>
   );
 };

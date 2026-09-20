@@ -1,20 +1,32 @@
 @import 'tailwindcss';
 
 :root {
-  --color-primary: #1e3a5f;
-  --color-secondary: #6b46c1;
-  --color-accent: #3b82f6;
-  --color-correct: #22c55e;
-  --color-incorrect: #ef4444;
-  --color-warning: #f59e0b;
+  /* Dark stage arena */
+  --bg-stage: #080C11;
+  --bg-surface: #0E141E;
+  --bg-surface-elevated: #151F2E;
+
+  /* Veterinary identity palette */
+  --color-vet-deep-green: #123829;
+  --color-vet-sage: #648B68;
+  --color-vet-ivory: #FAF7F2;
+  --color-vet-terracotta: #D05F36;
+  --color-vet-teal: #1FD4A7;
+  --color-vet-teal-hover: #19C298;
+
+  /* Game accents */
+  --color-correct: #1FD4A7;
+  --color-incorrect: #EF4444;
+  --color-warning: #F59E0B;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: var(--color-primary);
-  color: white;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-stage);
+  color: #FAF7F2;
   min-height: 100dvh;
 }
 
@@ -22,4 +34,100 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+
+/* Animations & Game Feel */
+@keyframes ringOrbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ringOrbitReverse {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 12px rgba(31, 212, 167, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(31, 212, 167, 0.45));
+  }
+}
+
+@keyframes crossPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(208, 95, 54, 0.4));
+  }
+  50% {
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 10px rgba(208, 95, 54, 0.8));
+  }
+}
+
+@keyframes scanBeam {
+  0% {
+    top: 0%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 100%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.8;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.25s ease-out;
+}
+
+.animate-ring-orbit {
+  animation: ringOrbit 36s linear infinite;
+  transform-origin: center;
+}
+
+.animate-ring-orbit-reverse {
+  animation: ringOrbitReverse 44s linear infinite;
+  transform-origin: center;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+.animate-cross-pulse {
+  animation: crossPulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

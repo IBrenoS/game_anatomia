@@ -37,9 +37,9 @@ export function ScreenPage() {
 
   if (connectionState === 'disconnected' || connectionState === 'connecting') {
     return (
-      <div className="min-h-screen bg-[#1e3a5f] text-white flex flex-col items-center justify-center space-y-4">
-        <div className="w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-        <p className="text-3xl font-black">Conectando ao Telão do Jogo...</p>
+      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col items-center justify-center space-y-4">
+        <div className="w-12 h-12 border-4 border-[#1FD4A7] border-t-transparent rounded-full animate-spin" />
+        <p className="text-2xl sm:text-3xl font-black">Conectando ao Telão do Jogo...</p>
       </div>
     );
   }

@@ -1,133 +1,363 @@
-import React, { useState, useRef, KeyboardEvent, ChangeEvent } from 'react';
-import { useNavigate, Link } from 'react-router';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router';
+import BrandHeader from '../components/shared/BrandHeader.js';
+import BovinoEquinoEmblem from '../components/shared/BovinoEquinoEmblem.js';
+import QrScannerView from '../components/shared/QrScannerView.js';
+
+type HomeStep = 'welcome' | 'choice' | 'join';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [pinDigits, setPinDigits] = useState<string[]>(Array(6).fill(''));
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Determine initial step from URL params or pathname
+  const initialStep = (): HomeStep => {
+    const stepParam = searchParams.get('step');
+    if (stepParam === 'choice' || stepParam === 'join') return stepParam;
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/join')) return 'join';
+    return 'welcome';
+  };
 
-  const handlePinChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (!/^\d?$/.test(value)) return;
-    
-    const newPin = [...pinDigits];
-    newPin[index] = value;
-    setPinDigits(newPin);
+  const [step, setStep] = useState<HomeStep>(initialStep);
+  const [pinValue, setPinValue] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+  // Sync state with URL search params
+  const navigateToStep = (nextStep: HomeStep) => {
+    setStep(nextStep);
+    setPinError(null);
+    setIsCameraOpen(false);
+    if (nextStep === 'welcome') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        navigate('/');
+      } else {
+        setSearchParams({});
+      }
+    } else {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+        navigate(`/?step=${nextStep}`);
+      } else {
+        setSearchParams({ step: nextStep });
+      }
     }
   };
 
-  const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !pinDigits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+  // Sync step if search params change via browser back/forward
+  useEffect(() => {
+    const stepParam = searchParams.get('step');
+    if (stepParam === 'choice') setStep('choice');
+    else if (stepParam === 'join') setStep('join');
+    else if (!stepParam && window.location.pathname === '/') setStep('welcome');
+  }, [searchParams]);
+
+  // Format PIN with space in middle: "529 734"
+  const handlePinInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawDigits = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPinError(null);
+    if (rawDigits.length > 3) {
+      setPinValue(`${rawDigits.slice(0, 3)} ${rawDigits.slice(3)}`);
+    } else {
+      setPinValue(rawDigits);
     }
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePastePin = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pastedData) return;
-
-    const newPin = [...pinDigits];
-    for (let i = 0; i < 6; i++) {
-      newPin[i] = pastedData[i] || '';
-    }
-    setPinDigits(newPin);
-
-    const focusIndex = Math.min(pastedData.length, 5);
-    inputRefs.current[focusIndex]?.focus();
-  };
-
-  const handleJoin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const pin = pinDigits.join('');
-    if (pin.length === 6) {
-      navigate(`/join/${pin}`);
+    const text = e.clipboardData.getData('text').trim();
+    if (!text) return;
+    setPinError(null);
+    const urlMatch = text.match(/join\/(\d{6})/i);
+    const pinMatch = urlMatch
+      ? urlMatch[1]
+      : (text.match(/\b(\d{6})\b/) ? text.match(/\b(\d{6})\b/)![1] : text.replace(/\D/g, '').slice(0, 6));
+    if (pinMatch.length > 3) {
+      setPinValue(`${pinMatch.slice(0, 3)} ${pinMatch.slice(3)}`);
+    } else {
+      setPinValue(pinMatch);
     }
   };
 
-  const isPinComplete = pinDigits.join('').length === 6;
+  const cleanPin = pinValue.replace(/\s+/g, '');
+  const isPinReady = cleanPin.length === 6;
+
+  const handleJoinByPin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!isPinReady) {
+      setPinError('Digite o PIN de 6 dígitos da sala.');
+      return;
+    }
+    navigate(`/join/${cleanPin}`);
+  };
+
+  const handleScanSuccess = (scannedPin: string) => {
+    navigate(`/join/${scannedPin}`);
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1e3a5f] via-[#152a45] to-[#0f1d30] text-white flex flex-col justify-between p-4 md:p-8">
-      {/* Top Brand Bar */}
-      <header className="w-full max-w-md mx-auto flex justify-center py-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-blue-200">
-          <span>🐎 Bovino × Equino 🐂</span>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col justify-between p-4 sm:p-6 md:p-10 relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div 
+        className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#123829]/20 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
+      <div 
+        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#D05F36]/10 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
 
-      {/* Main Form Container */}
-      <main className="w-full max-w-md mx-auto my-auto flex flex-col items-center space-y-8">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white drop-shadow-md flex items-center justify-center gap-3">
-            <span role="img" aria-label="Osso">🦴</span>
-            <span>Batalha Anatômica</span>
-          </h1>
-          <p className="text-xl sm:text-2xl text-blue-200 font-bold">
-            Bovino <span className="text-yellow-400">×</span> Equino
-          </p>
-          <p className="text-sm text-blue-300/80">
-            Digite o PIN fornecido no telão para entrar na arena
-          </p>
-        </div>
+      <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col justify-between z-10">
+        {/* Brand Top Header */}
+        <BrandHeader showArenaStatus={false} />
 
-        <form 
-          onSubmit={handleJoin} 
-          className="w-full bg-[#152a45] p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-900/50 flex flex-col items-center space-y-8"
-        >
-          <div className="space-y-4 w-full">
-            <label 
-              htmlFor="pin-input-0" 
-              className="block text-center text-blue-100 font-bold text-lg tracking-wide uppercase"
-            >
-              PIN da Partida
-            </label>
-            <div className="flex justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
-              {pinDigits.map((digit, i) => (
-                <input
-                  key={i}
-                  id={`pin-input-${i}`}
-                  ref={(el) => { inputRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handlePinChange(i, e)}
-                  onKeyDown={(e) => handleKeyDown(i, e)}
-                  className="w-10 h-14 sm:w-12 sm:h-16 text-center text-2xl font-black bg-white text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500 focus:border-transparent transition-all uppercase shadow-inner"
-                  aria-label={`Dígito ${i + 1} do PIN`}
-                  autoFocus={i === 0}
-                />
-              ))}
+        {/* ========================================================
+            TELA 1 — ABERTURA
+           ======================================================== */}
+        {step === 'welcome' && (
+          <main className="w-full my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+              {/* Left Column: Hero Text & Main CTA */}
+              <div className="lg:col-span-7 flex flex-col items-start space-y-6 sm:space-y-8">
+                {/* Veterinary label */}
+                <span className="text-xs font-bold uppercase tracking-wider text-[#1FD4A7]">
+                  ANATOMIA VETERINÁRIA
+                </span>
+
+                {/* Main Display Title */}
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-[1.08]">
+                  Conhecimento<br />
+                  em modo<br />
+                  <span className="text-white">batalha.</span>
+                </h1>
+
+                {/* Subtitle */}
+                <p className="text-base sm:text-lg text-slate-300 max-w-md font-normal leading-relaxed">
+                  Bovino × Equino em uma disputa rápida para jogar em grupo.
+                </p>
+
+                {/* Mobile Emblem position */}
+                <div className="lg:hidden w-full flex justify-center py-2">
+                  <BovinoEquinoEmblem size="sm" />
+                </div>
+
+                {/* Dominant Action CTA */}
+                <div className="w-full sm:w-auto flex flex-col items-start space-y-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigateToStep('choice')}
+                    className="w-full sm:w-auto min-w-[200px] py-4 px-10 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-black text-lg tracking-wide shadow-[0_0_24px_rgba(31,212,167,0.25)] hover:shadow-[0_0_32px_rgba(31,212,167,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                  >
+                    Iniciar
+                  </button>
+
+                </div>
+              </div>
+
+              {/* Right Column: Free-Floating Graphic Hero Panel (Desktop) */}
+              <div className="hidden lg:flex lg:col-span-5 justify-end">
+                <BovinoEquinoEmblem size="lg" />
+              </div>
             </div>
-          </div>
+          </main>
+        )}
 
-          <button
-            type="submit"
-            disabled={!isPinComplete}
-            className="w-full min-h-[52px] py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-slate-700 disabled:to-slate-800 disabled:opacity-50 text-white text-xl font-black rounded-xl transition-all shadow-lg active:scale-95 cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <span>Entrar na batalha</span>
-            <span>➔</span>
-          </button>
-        </form>
-      </main>
+        {/* ========================================================
+            TELA 2 — ESCOLHA DE CAMINHO
+           ======================================================== */}
+        {step === 'choice' && (
+          <main className="w-full my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
+            <div className="space-y-3 mb-8 sm:mb-12 text-left">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
+                Como você quer começar?
+              </h1>
+            </div>
 
-      {/* Discrete Presenter Footer */}
-      <footer className="w-full max-w-md mx-auto py-6 text-center border-t border-blue-900/40 text-xs sm:text-sm text-blue-300/80">
-        <p>
-          É o apresentador?{' '}
-          <Link 
-            to="/host" 
-            className="text-white hover:text-yellow-300 font-bold underline transition-colors underline-offset-2"
-          >
-            Abrir painel
-          </Link>
-        </p>
-      </footer>
+            {/* Path Selection: Side-by-side on desktop, stacked on mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-stretch">
+              {/* CAMINHO 1: JOGAR */}
+              <section 
+                aria-labelledby="heading-jogar"
+                className="flex flex-col justify-between space-y-6 md:border-r md:border-white/10 md:pr-12 border-b md:border-b-0 border-white/10 pb-8 md:pb-0 text-left"
+              >
+                <div className="space-y-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#1FD4A7] block">
+                    JOGAR
+                  </span>
+                  <h2 id="heading-jogar" className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    Entrar em uma partida
+                  </h2>
+                  <p className="text-sm sm:text-base text-slate-300">
+                    Tenho um PIN ou QR Code.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigateToStep('join')}
+                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] text-[#080C11] font-bold text-base tracking-wide shadow-[0_4px_16px_rgba(31,212,167,0.2)] transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Entrar para jogar</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </section>
+
+              {/* CAMINHO 2: CRIAR */}
+              <section 
+                aria-labelledby="heading-criar"
+                className="flex flex-col justify-between space-y-6 text-left"
+              >
+                <div className="space-y-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-[#D05F36] block">
+                    CRIAR
+                  </span>
+                  <h2 id="heading-criar" className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                    Criar uma nova batalha
+                  </h2>
+                  <p className="text-sm sm:text-base text-slate-300">
+                    Vou organizar e controlar a sala.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/host')}
+                    className="w-full sm:w-auto min-w-[220px] py-3.5 px-6 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-base tracking-wide border border-white/15 hover:border-white/30 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Criar partida</span>
+                    <span>→</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            {/* Back to welcome navigation */}
+            <div className="mt-12 pt-6 border-t border-white/10 text-left">
+              <button
+                type="button"
+                onClick={() => navigateToStep('welcome')}
+                className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>←</span>
+                <span>Voltar</span>
+              </button>
+            </div>
+          </main>
+        )}
+
+        {/* ========================================================
+            TELA 3 — ENTRAR NA BATALHA (PLAYER PIN & QR)
+           ======================================================== */}
+        {step === 'join' && (
+          <main className="w-full max-w-md mx-auto my-auto py-8 sm:py-12 animate-[fadeInScale_0.3s_ease-out]">
+            <div className="space-y-2 mb-6 text-left">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white">
+                Entrar na batalha
+              </h1>
+              <p className="text-sm sm:text-base text-slate-400">
+                Digite o PIN da sala.
+              </p>
+            </div>
+
+            {/* PIN Entry Form (Primary Action) */}
+            <form onSubmit={handleJoinByPin} className="space-y-4">
+              <div>
+                {/* Prominent White/Ivory Rounded Box */}
+                <div className="w-full bg-[#FAF7F2] rounded-2xl p-4 sm:p-5 shadow-2xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all flex items-center justify-center">
+                  <input
+                    id="pin-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="one-time-code"
+                    placeholder="000 000"
+                    value={pinValue}
+                    onChange={handlePinInput}
+                    onPaste={handlePastePin}
+                    maxLength={7}
+                    autoFocus
+                    aria-label="PIN da sala"
+                    className="w-full bg-transparent text-[#080C11] font-mono font-black text-3xl sm:text-4xl text-center tracking-[0.25em] outline-none placeholder:text-slate-400/50"
+                  />
+                </div>
+
+                {pinError && (
+                  <p className="text-xs text-rose-400 font-medium mt-2 text-left" role="alert">
+                    {pinError}
+                  </p>
+                )}
+              </div>
+
+              {/* Dominant CTA Button */}
+              <button
+                type="submit"
+                disabled={!isPinReady}
+                className="w-full py-4 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                <span>Entrar</span>
+                <span>→</span>
+              </button>
+            </form>
+
+            {/* Separator Below */}
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-[11px] uppercase tracking-wider font-bold text-slate-500">
+                OU ENTRE PELA CÂMERA
+              </span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* QR Scanner Alternative (Discrete, non-competing) */}
+            <div className="w-full">
+              {!isCameraOpen ? (
+                <div className="w-full bg-[#0E1522] rounded-2xl p-4 sm:p-5 border border-white/10 flex items-center justify-between shadow-lg">
+                  <div className="space-y-1 text-left">
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      Escanear QR Code
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      Aponte para o código da sala.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCameraOpen(true)}
+                    className="py-2.5 px-4 rounded-xl bg-[#151F2E] hover:bg-[#1C293D] text-white font-bold text-xs tracking-wide border border-white/15 transition-all active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Abrir câmera
+                  </button>
+                </div>
+              ) : (
+                <QrScannerView 
+                  onScanSuccess={handleScanSuccess} 
+                  onClose={() => setIsCameraOpen(false)} 
+                />
+              )}
+            </div>
+
+            {/* Back Navigation */}
+            <div className="mt-8 pt-6 border-t border-white/10 text-left">
+              <button
+                type="button"
+                onClick={() => navigateToStep('choice')}
+                className="text-xs sm:text-sm text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>←</span>
+                <span>Voltar</span>
+              </button>
+            </div>
+          </main>
+        )}
+
+        {/* Footer info */}
+        <footer className="w-full py-4 text-center text-xs text-slate-500">
+          <span>Batalha Anatômica • Medicina Veterinária</span>
+        </footer>
+      </div>
     </div>
   );
 };

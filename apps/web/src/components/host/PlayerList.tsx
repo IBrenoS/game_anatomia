@@ -1,61 +1,69 @@
+import React from 'react';
 import { useGameStore } from '../../stores/gameStore.js';
 
 interface PlayerListProps {
   players: Array<{ playerId: string; nickname: string }>;
   presences: Array<{ playerId: string; connected: boolean }>;
   onRemovePlayer?: (playerId: string, nickname: string) => void;
+  isHostPlaying?: boolean;
 }
 
-export default function PlayerList({ players, presences, onRemovePlayer }: PlayerListProps) {
-  const connectedCount = useGameStore((state) => state.connectedPlayers);
-  const totalPlayers = useGameStore((state) => state.totalPlayers);
+export const PlayerList: React.FC<PlayerListProps> = ({
+  players,
+  presences,
+  onRemovePlayer,
+  isHostPlaying = false,
+}) => {
+  const currentLocalPlayerId = useGameStore((state) => state.playerId);
 
   return (
-    <div className="bg-black/20 rounded-xl p-4 flex flex-col h-full">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="text-base font-semibold text-white">
-          Participantes ({connectedCount}/{totalPlayers} conectados)
-        </h3>
-        <span className="text-xs text-blue-200">Em tempo real</span>
-      </div>
-
-      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-        {players.map(player => {
-          const presence = presences.find(p => p.playerId === player.playerId);
+    <div className="w-full flex flex-col space-y-2 select-none">
+      <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+        {players.map((player) => {
+          const presence = presences.find((p) => p.playerId === player.playerId);
           const isConnected = presence ? presence.connected : false;
-          
+          const isThisHostPlayer = isHostPlaying && player.playerId === currentLocalPlayerId;
+
           return (
-            <div 
-              key={player.playerId} 
-              className={`flex items-center justify-between p-2.5 rounded-xl transition-all duration-200 border motion-reduce:transition-none ${
-                isConnected 
-                  ? 'bg-white/5 hover:bg-white/10 text-white border-white/5' 
-                  : 'bg-white/[0.02] text-slate-400 border-dashed border-white/10'
+            <div
+              key={player.playerId}
+              className={`flex items-center justify-between py-2 px-3 rounded-xl transition-all duration-200 group ${
+                isConnected
+                  ? 'bg-white/5 hover:bg-white/10 text-white'
+                  : 'bg-white/[0.02] text-slate-400'
               }`}
             >
               <div className="flex items-center gap-2.5 truncate">
-                <span 
-                  className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                    isConnected 
-                      ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse motion-reduce:animate-none' 
-                      : 'bg-amber-400/80 shadow-[0_0_4px_rgba(251,191,36,0.4)]'
-                  }`} 
-                  title={isConnected ? 'Conectado' : 'Temporariamente desconectado'} 
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    isConnected
+                      ? 'bg-[#1FD4A7] shadow-[0_0_8px_rgba(31,212,167,0.7)] animate-pulse motion-reduce:animate-none'
+                      : 'bg-amber-400/70'
+                  }`}
+                  aria-hidden="true"
                 />
-                <span className={`truncate font-medium text-sm ${isConnected ? 'text-white' : 'text-slate-400 italic'}`}>
+                <span className="font-semibold text-sm sm:text-base text-white truncate">
                   {player.nickname}
                 </span>
+
+                {isThisHostPlayer && (
+                  <span className="text-[11px] font-medium text-[#1FD4A7] bg-[#123829] px-2 py-0.5 rounded-full border border-[#1FD4A7]/30 shrink-0">
+                    você também joga
+                  </span>
+                )}
+
                 {!isConnected && (
-                  <span className="text-[11px] text-amber-300/80 font-normal bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
-                    desconectado
+                  <span className="text-[10px] text-amber-300 font-normal bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/20 shrink-0">
+                    reconectando
                   </span>
                 )}
               </div>
+
               {onRemovePlayer && (
                 <button
                   type="button"
                   onClick={() => onRemovePlayer(player.playerId, player.nickname)}
-                  className="text-xs text-red-300 hover:text-white hover:bg-red-900/60 px-2.5 py-1 rounded-lg transition-colors shrink-0 font-medium cursor-pointer"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[11px] text-rose-400 hover:text-white hover:bg-rose-900/50 px-2 py-0.5 rounded transition-all shrink-0 cursor-pointer"
                   title={`Remover ${player.nickname}`}
                   aria-label={`Remover participante ${player.nickname}`}
                 >
@@ -65,12 +73,15 @@ export default function PlayerList({ players, presences, onRemovePlayer }: Playe
             </div>
           );
         })}
+
         {players.length === 0 && (
-          <p className="text-sm text-blue-200/70 text-center py-6">
+          <p className="text-xs sm:text-sm text-slate-400 py-4 italic">
             Nenhum participante conectado ainda.
           </p>
         )}
       </div>
     </div>
   );
-}
+};
+
+export default PlayerList;

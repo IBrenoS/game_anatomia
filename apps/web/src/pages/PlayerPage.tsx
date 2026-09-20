@@ -54,10 +54,10 @@ export function PlayerPage() {
   const isConnected = connectionState === 'connected' || manager.state === 'connected';
   if (!isConnected && (connectionState === 'disconnected' || connectionState === 'connecting')) {
     return (
-      <div className="min-h-screen bg-[#1e3a5f] text-white flex items-center justify-center p-4 text-center">
+      <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex items-center justify-center p-4 text-center">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xl font-bold">Conectando ao jogo...</p>
+          <div className="w-10 h-10 border-3 border-[#1FD4A7] border-t-transparent rounded-full animate-spin" />
+          <p className="text-base font-bold text-slate-300">Conectando ao jogo...</p>
         </div>
       </div>
     );
@@ -99,12 +99,16 @@ export function PlayerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1e3a5f] text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col relative overflow-hidden">
       <ReconnectOverlay isReconnecting={connectionState === 'reconnecting'} />
-      <header className="p-3 bg-black/20 flex justify-between items-center text-sm border-b border-white/10">
-        <span className="font-bold text-blue-200">PIN: {pin}</span>
-        <span className="font-bold bg-blue-600/40 px-3 py-1 rounded-full">{nickname || 'Jogador'}</span>
-      </header>
+      {roomState !== 'LOBBY' && (
+        <header className="p-3 bg-[#0E1522] flex justify-between items-center text-xs sm:text-sm border-b border-white/10">
+          <span className="font-mono font-bold text-slate-300">PIN: {pin}</span>
+          <span className="font-bold text-[#1FD4A7] bg-[#123829] border border-[#1FD4A7]/30 px-3 py-0.5 rounded-full">
+            {nickname || 'Jogador'}
+          </span>
+        </header>
+      )}
       <main className="flex-1 flex flex-col p-4">
         {renderContent()}
       </main>

@@ -111,107 +111,138 @@ export function JoinPage() {
 
   if (isChecking) {
     return (
-      <div className="min-h-screen bg-[#1e3a5f] flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Carregando" />
+      <div className="min-h-screen bg-[#080C11] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-[#1FD4A7] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Carregando" />
+          <span className="text-xs font-bold text-slate-400">Verificando a sala...</span>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1e3a5f] via-[#152a45] to-[#0f1d30] text-white flex flex-col justify-between p-4 md:p-8">
-      <header className="w-full max-w-md mx-auto flex justify-center py-4">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-blue-200">
-          <span>🐎 Bovino × Equino 🐂</span>
-        </div>
-      </header>
+  const formattedPin = pin && pin.length === 6 ? `${pin.slice(0, 3)} ${pin.slice(3)}` : pin;
 
-      <main className="w-full max-w-md mx-auto my-auto flex flex-col items-center">
-        <div className="w-full bg-[#152a45] p-6 sm:p-8 rounded-3xl shadow-2xl border border-blue-900/50 flex flex-col items-center space-y-6">
-          <div className="text-center">
-            <h1 className="text-2xl sm:text-3xl font-black mb-1 flex items-center justify-center gap-2">
-              <span role="img" aria-label="Anatomia">🦴</span>
-              <span>Batalha Anatômica</span>
+  return (
+    <div className="min-h-screen bg-[#080C11] text-[#FAF7F2] flex flex-col justify-between p-4 sm:p-6 md:p-10 relative overflow-hidden">
+      {/* Background ambient light */}
+      <div 
+        className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#123829]/20 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
+      <div 
+        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-[#D05F36]/10 blur-3xl pointer-events-none" 
+        aria-hidden="true" 
+      />
+
+      <div className="w-full max-w-md mx-auto flex-1 flex flex-col justify-between z-10">
+        <header className="w-full flex justify-between items-center py-4 select-none">
+          <div className="flex flex-col">
+            <span className="text-xs sm:text-sm font-black tracking-widest text-white uppercase">
+              BATALHA ANATÔMICA
+            </span>
+            <span className="text-[10px] sm:text-xs font-bold tracking-wider text-slate-400 uppercase">
+              BOVINO <span className="text-[#D05F36]">×</span> EQUINO
+            </span>
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#123829]/60 border border-[#1FD4A7]/30 text-[#1FD4A7] text-xs font-bold font-mono">
+            <span>PIN {formattedPin}</span>
+          </div>
+        </header>
+
+        <main className="w-full my-auto py-8 animate-[fadeInScale_0.3s_ease-out]">
+          <div className="space-y-2 mb-6 text-left">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Entrar na batalha
             </h1>
-            <p className="text-xs uppercase tracking-widest text-blue-300 font-bold mb-3">
-              PIN da Arena
+            <p className="text-xs sm:text-sm text-slate-400">
+              Digite seu nome ou apelido para participar.
             </p>
-            <div className="text-4xl font-mono font-black tracking-widest text-yellow-300 bg-black/30 py-2 px-4 rounded-xl border border-white/10" aria-label={`PIN: ${pin}`}>
-              {pin}
-            </div>
           </div>
 
           {!isValidRoom ? (
-            <div className="w-full text-center p-5 bg-red-950/70 border border-red-500/50 rounded-2xl text-red-200 space-y-4" role="alert">
-              <p className="font-semibold">{error}</p>
+            <div className="w-full text-center p-6 bg-rose-950/60 border border-rose-500/40 rounded-2xl text-rose-200 space-y-4" role="alert">
+              <p className="text-sm font-semibold">{error}</p>
               <button
                 type="button"
-                onClick={() => navigate('/')}
-                className="w-full py-2.5 px-4 bg-red-800 hover:bg-red-700 rounded-xl font-bold transition-all shadow cursor-pointer"
+                onClick={() => navigate('/?step=join')}
+                className="w-full py-3 px-4 bg-[#151F2E] hover:bg-[#1C293D] rounded-xl text-xs font-bold text-white transition-all border border-white/10 cursor-pointer"
               >
                 Digitar outro PIN
               </button>
             </div>
           ) : (
-          <form onSubmit={handleJoin} className="w-full space-y-6 flex flex-col">
-            <p className="text-blue-200 text-sm text-center">
-              Seu apelido será visível no telão e apagado após o fim do jogo.
-            </p>
-            <div className="space-y-2">
-              <label htmlFor="nickname" className="block text-blue-100 font-medium">
-                Seu Apelido
-              </label>
-              <input
-                id="nickname"
-                type="text"
-                value={nickname}
-                onChange={(e) => { setNickname(e.target.value); setError(''); }}
-                placeholder="Ex: João Silva"
-                className="w-full p-4 bg-white text-gray-900 rounded-xl text-lg font-bold focus:outline-none focus:ring-4 focus:ring-blue-500 placeholder-gray-400 shadow-inner"
-                minLength={2}
-                maxLength={20}
-                autoComplete="off"
-                required
-                aria-describedby={error ? 'nickname-error' : undefined}
-              />
-              {error && (
-                <p id="nickname-error" className="text-red-400 text-sm mt-2" role="alert">{error}</p>
-              )}
-            </div>
+            <form onSubmit={handleJoin} className="w-full space-y-5 flex flex-col">
+              <div className="space-y-2">
+                <label htmlFor="nickname" className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Seu apelido
+                </label>
+                <div className="w-full bg-[#FAF7F2] rounded-xl p-3.5 shadow-xl border border-white/20 focus-within:ring-4 focus-within:ring-[#1FD4A7]/50 transition-all">
+                  <input
+                    id="nickname"
+                    type="text"
+                    aria-label="Seu apelido"
+                    value={nickname}
+                    onChange={(e) => { setNickname(e.target.value); setError(''); }}
+                    placeholder="Ex: João Silva"
+                    className="w-full bg-transparent text-[#080C11] font-bold text-base sm:text-lg outline-none placeholder:text-slate-400"
+                    minLength={2}
+                    maxLength={20}
+                    autoComplete="off"
+                    required
+                    autoFocus
+                    aria-describedby={error ? 'nickname-error' : undefined}
+                  />
+                </div>
+                {error && (
+                  <p id="nickname-error" className="text-xs text-rose-400 font-medium mt-1" role="alert">
+                    {error}
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  Seu nome aparecerá no telão e no ranking da partida.
+                </p>
+              </div>
 
+              <button
+                type="submit"
+                aria-label={isJoining ? 'Entrando na arena' : 'Entrar para jogar — Entrar na arena'}
+                disabled={isJoining || nickname.trim().length < 2}
+                className="w-full py-4 px-6 rounded-xl bg-[#1FD4A7] hover:bg-[#19C298] disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 text-[#080C11] font-black text-base tracking-wide shadow-[0_4px_20px_rgba(31,212,167,0.25)] transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isJoining ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-[#080C11] border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Conectando" />
+                    <span>Entrando na arena...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Entrar para jogar</span>
+                    <span>→</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          <div className="mt-8 pt-4 border-t border-white/10">
             <button
-              type="submit"
-              disabled={isJoining}
-              className="w-full min-h-[52px] py-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-slate-700 disabled:to-slate-800 disabled:opacity-50 text-white text-xl font-black rounded-xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-wait"
+              type="button"
+              onClick={() => navigate('/?step=join')}
+              className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              {isJoining ? (
-                <>
-                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin motion-reduce:animate-none" aria-label="Conectando" />
-                  <span>Entrando na arena...</span>
-                </>
-              ) : (
-                <>
-                  <span>Entrar na arena</span>
-                  <span>➔</span>
-                </>
-              )}
+              <span>←</span>
+              <span>Trocar PIN</span>
             </button>
-          </form>
-        )}
-        </div>
-      </main>
+          </div>
+        </main>
 
-      <footer className="w-full max-w-md mx-auto py-6 text-center border-t border-blue-900/40 text-xs text-blue-300/80">
-        <p>
-          Entrou no PIN errado?{' '}
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="text-white hover:text-yellow-300 font-bold underline transition-colors underline-offset-2"
-          >
-            Trocar PIN
-          </button>
-        </p>
-      </footer>
+        <footer className="w-full py-4 text-center text-xs text-slate-500">
+          <span>Batalha Anatômica • Medicina Veterinária</span>
+        </footer>
+      </div>
     </div>
   );
 }
+
+export default JoinPage;
