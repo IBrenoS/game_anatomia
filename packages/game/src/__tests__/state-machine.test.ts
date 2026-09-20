@@ -13,6 +13,7 @@ describe('state-machine', () => {
   it('allows valid transitions', () => {
     expect(canTransition('LOBBY', 'COUNTDOWN')).toBe(true);
     expect(canTransition('QUESTION_ACTIVE', 'QUESTION_REVEAL')).toBe(true);
+    expect(canTransition('QUESTION_ACTIVE', 'FINISHED')).toBe(true);
   });
 
   it('denies invalid transitions', () => {

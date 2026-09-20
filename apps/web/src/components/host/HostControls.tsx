@@ -91,6 +91,13 @@ export default function HostControls({ roomState, adminConnectionState }: HostCo
             >
               ⏹ Encerrar Questão
             </button>
+            <button
+              type="button"
+              onClick={() => setConfirmAction('END_GAME')}
+              className="px-3.5 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            >
+              Finalizar Partida
+            </button>
           </div>
         );
       case 'PAUSED':

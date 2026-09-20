@@ -7,6 +7,7 @@ export const VALID_TRANSITIONS: Transition[] = [
   { from: 'LOBBY', to: 'FINISHED', trigger: 'host ends' },
   { from: 'COUNTDOWN', to: 'QUESTION_ACTIVE', trigger: 'countdown ends' },
   { from: 'QUESTION_ACTIVE', to: 'QUESTION_REVEAL', trigger: 'all answered / deadline / host ends' },
+  { from: 'QUESTION_ACTIVE', to: 'FINISHED', trigger: 'host ends game' },
   { from: 'QUESTION_ACTIVE', to: 'PAUSED', trigger: 'host pauses' },
   { from: 'QUESTION_REVEAL', to: 'ROUND_RANKING', trigger: 'timer / host shows ranking' },
   { from: 'QUESTION_REVEAL', to: 'FINAL_RANKING', trigger: 'timer / host shows ranking (last question)' },

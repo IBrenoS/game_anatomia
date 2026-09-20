@@ -642,6 +642,7 @@ describe('Player Surface Redesign — Comprehensive Acceptance Suite', () => {
     expect(html).toContain('Tela Cheia');
     expect(html).toContain('Pausar');
     expect(html).toContain('Encerrar Questão');
+    expect(html).toContain('Finalizar Partida');
     expect(html).toContain('gap-2 sm:gap-3');
   });
 

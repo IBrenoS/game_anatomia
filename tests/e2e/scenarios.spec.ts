@@ -349,12 +349,10 @@ test.describe('Batalha Anatômica — Operational Scenarios & Edge Cases', () =>
 
     // Host starts and ends game to FINISHED
     await hostPage.getByRole('button', { name: /iniciar partida/i }).first().click();
-    await expect(hostPage.getByRole('button', { name: /pausar rodada/i })).toBeVisible({ timeout: 12000 });
 
-    // Host pauses and ends game
-    await hostPage.getByRole('button', { name: /pausar rodada/i }).click();
+    // Host can end an active match without pausing or completing all questions.
     const endGameBtn = hostPage.getByRole('button', { name: /finalizar partida/i });
-    await expect(endGameBtn).toBeVisible({ timeout: 5000 });
+    await expect(endGameBtn).toBeVisible({ timeout: 12000 });
     await endGameBtn.click();
     const confirmEndBtn = hostPage.getByRole('button', { name: /finalizar agora/i });
     await expect(confirmEndBtn).toBeVisible({ timeout: 5000 });

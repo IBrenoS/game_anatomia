@@ -26,8 +26,8 @@ export const HEARTBEAT_PONG_FRAME = 'pong';
 /** PRD p.10: Presence timeout (inactive after 10s without signal) */
 export const PRESENCE_TIMEOUT_MS = 10_000;
 
-/** PRD p.21: Room expires 24h after FINISHED */
-export const ROOM_EXPIRY_MS = 24 * 60 * 60 * 1000;
+/** Finished rooms remain available for one hour to serve final snapshots and reconnects. */
+export const ROOM_EXPIRY_MS = 60 * 60 * 1000;
 
 /** Quiz de músculos: total number of questions */
 export const TOTAL_QUESTIONS = 15;
